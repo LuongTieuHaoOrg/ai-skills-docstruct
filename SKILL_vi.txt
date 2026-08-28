@@ -9,7 +9,8 @@ name: docstruct
 description: Quản lý, kiểm tra và tạo cấu trúc tài liệu dự án theo mô hình Atomic
 Content Blocks. Kích hoạt khi user muốn khởi tạo cấu trúc tài liệu cho dự án mới,
 tổ chức/refactor tài liệu đang tồn tại, kiểm tra chất lượng docs, hoặc tổng hợp
-tài liệu hoàn chỉnh (BRD, PRD, SAD, FSD...) từ các khối nội dung có sẵn.
+tài liệu hoàn chỉnh (BRD, PRD, SAD, FSD...) từ các khối nội dung có sẵn, hoặc thảo
+luận theo phiên. Gõ /docstruct không tham số để xem cấu trúc hiện tại và hướng dẫn.
 
 ================================================================================
 1. TỔNG QUAN
@@ -25,7 +26,7 @@ SAD, FSD...).
 - **Nguyên tử:** mỗi block là một đối tượng riêng — dễ phân công, theo dõi trạng
   thái, quản lý phiên bản.
 - **Linh hoạt:** tài liệu đầu ra chỉ là các "View" được tổng hợp từ cùng tập block
-  gốc theo **Aggregation Matrix** (Mục 6).
+  gốc theo **Aggregation Matrix** (Mục 8).
 
 ================================================================================
 2. WORKSPACE `.docstruct/`
@@ -34,21 +35,111 @@ SAD, FSD...).
 Skill lưu toàn bộ cấu hình và trạng thái vào `.docstruct/` tại gốc dự án:
 
 .docstruct/
-├── project-profile.yaml   # Hồ sơ dự án: loại, audience, quy mô, doc-root, cấu hình ngôn ngữ
+├── project-profile.yaml   # Hồ sơ dự án: loại, audience, doc-root, cấu hình ngôn ngữ
 ├── schema.yaml            # Cây thư mục đã duyệt + ma trận tổng hợp
-└── status/                # Trạng thái từng block: draft / review / approved
+├── status/                # Trạng thái từng block: draft / review / approved
+└── chats/                 # Phiên thảo luận (xem Mục 4)
+    ├── _active            # File text chứa id phiên đang active, nếu có
+    └── <id>.md            # Mỗi phiên một file, id = [a-z0-9]{6-8}
 
 > QUAN TRỌNG: `project-profile.yaml` ghi rõ **doc-root** — vị trí lưu tài liệu do
-> user chọn khi chạy `init`. Mọi lệnh (validate, generate) phải đọc config này
-> trước khi thao tác. Tuyệt đối không suy đoán doc-root.
+> user chọn khi chạy `init`. Mọi lệnh (validate, generate, chat) phải đọc config
+> này trước khi thao tác. Tuyệt đối không suy đoán doc-root.
 
 > CẤU HÌNH NGÔN NGỮ: `project-profile.yaml` cũng ghi **ngôn ngữ trả lời**
 > (`language.response`) và **ngôn ngữ tài liệu** (`language.documentation`). Đây
-> là nguồn sự thật duy nhất cho mọi quyết định giao tiếp và nội dung — xem Mục 8.
+> là nguồn sự thật duy nhất cho mọi quyết định giao tiếp và nội dung — xem Mục 10.
 > Nếu trống hoặc thiếu, phải hỏi user trước khi chạy lệnh nào.
 
+> CHẾ ĐỘ CHAT NGẦM ĐỊNH: Ở đầu MỌI lượt (dù user có gõ /docstruct hay không), kiểm
+> tra `.docstruct/chats/_active`. Nếu tồn tại và `chats/<id>.md` tồn tại, coi tin
+> nhắn của user là tiếp nối phiên đó: cập nhật biên bản theo Mục 4 và prefix trả
+> lời bằng `[chat: <id>]`. `chat close` xóa `_active` để thoát.
+
 ================================================================================
-3. LỆNH `/docstruct init <mô tả dự án>`
+3. LỆNH `/docstruct` (không tham số) - HELP & STATUS DASHBOARD
+================================================================================
+
+Khi user chạy `/docstruct` không tham số, hoặc tham số không khớp lệnh nào, KHÔNG
+thực thi workflow. Thay vào đó hiển thị dashboard help:
+
+1. **Đọc trạng thái** - nếu `.docstruct/project-profile.yaml` và `schema.yaml` tồn
+   tại, đọc `docroot` và liệt kê cây thư mục thực tế dưới doc-root (mỗi folder
+   00-common -> 99-assets: tồn tại/thiếu, số file). Nếu chưa init, hiện
+   `Not initialized` và preview cây chuẩn từ Mục 9.
+2. **Kiểm tra chat active** - nếu `.docstruct/chats/_active` tồn tại, hiện
+   `Active chat: <id> (topic)` và tóm tắt một dòng từ `chats/<id>.md`.
+3. **Tóm tắt lệnh:**
+
+   | Lệnh | Khi nào dùng | Ví dụ |
+   |------|-------------|-------|
+   | `/docstruct init <mô tả>` | Khởi tạo cấu trúc 12 folder | `/docstruct init E-commerce Next.js + PostgreSQL` |
+   | `/docstruct validate [phạm vi]` | Audit Structure/Content/Terminology/Formatting | `/docstruct validate 04-architecture` |
+   | `/docstruct generate <loại> <mô tả>` | Tổng hợp tài liệu BRD/PRD/SAD... | `/docstruct generate SAD customer review` |
+   | `/docstruct chat new [topic]` | Bắt đầu phiên thảo luận (implicit) | `/docstruct chat new Data model` |
+   | `/docstruct chat -<id>` | Mở lại phiên `<id>` (bỏ dấu `-`) | `/docstruct chat -a1b2c3` |
+   | `/docstruct chat list` | Liệt kê phiên | `/docstruct chat list` |
+   | `/docstruct chat close` | Thoát chat mode | `/docstruct chat close` |
+   | `/docstruct chat delete -<id>` | Xóa phiên `<id>` hẳn | `/docstruct chat delete -a1b2c3` |
+
+4. **Hiện Aggregation Matrix rút gọn** - BRD/PRD/SAD/FSD từ Mục 8.
+5. **Không tạo/sửa file.** Nếu token đầu không khớp (vd `/docstruct foo`), prefix
+   `Unknown command 'foo'. Valid: init, validate, generate, chat.` và gợi ý gần đúng.
+   Alias `help`, `--help`, `-h` cũng hiện dashboard. So khớp case-insensitive.
+
+================================================================================
+4. LỆNH `/docstruct chat ...` - PHIÊN THẢO LUẬN
+================================================================================
+
+Phiên thảo luận lưu biên bản (quyết định, câu hỏi mở, việc tiếp theo), không phải
+transcript thô. Tồn tại `.docstruct/chats/_active` nghĩa là implicit chat mode đang
+bật (xem Mục 2): mọi lượt user tiếp theo - kể cả không có prefix /docstruct - đều
+được coi là tiếp nối phiên đó cho đến `chat close`.
+
+### Lưu trữ
+
+.docstruct/chats/
+├── _active          # chứa id active, vd "a1b2c3" - không tồn tại = không active
+└── <id>.md          # id = [a-z0-9]{6-8}, mỗi phiên một file
+
+`_active` là nguồn duy nhất xác định phiên active. Không dùng field `status`. Xóa
+phiên là xóa hẳn file.
+
+### Schema file `chats/<id>.md`
+
+---
+id: abc123
+topic: "Data model cho 04-architecture"
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+related_paths: [04-architecture/03-data-model.md]
+---
+# Quyết định
+# Câu hỏi mở
+# Việc tiếp theo
+# Thuật ngữ mới (để sync vào 00-common/glossary.md)
+
+Mỗi lượt thảo luận agent đọc biên bản cũ, merge tóm tắt mới vào 3 mục trên, cập
+nhật `updated` và `related_paths`.
+
+### Subcommands
+
+| Subcommand | Hành vi |
+|------------|---------|
+| `chat new [topic]` | Tạo id `[a-z0-9]{6-8}` (nếu gõ `-abc` thì strip `-` -> `abc`). Tạo `chats/<id>.md` với `topic` (rỗng thì lấy tin nhắn đầu), ghi `_active=id`, trả `[chat: <id>] Created - mọi tin nhắn tiếp theo sẽ ghi vào đây. Dùng /docstruct chat close để thoát.` |
+| `chat -<id>` | Mở lại: id là token bỏ dấu `-` (vd `-a1b2c3` -> `a1b2c3`). Nếu `chats/<id>.md` tồn tại, ghi `_active=id` và trả tóm tắt biên bản. Không tồn tại -> báo lỗi + `chat list`. |
+| `chat list` | Liệt kê `chats/*.md` (trừ `_active`) dạng bảng `id | topic | updated | decisions#`, highlight `_active`. Read-only. |
+| `chat close` | Xóa file `_active`. Trả `[chat: <id>] Closed - đã thoát implicit mode. Biên bản giữ tại chats/<id>.md.` KHÔNG xóa minutes. |
+| `chat delete -<id>` | Xóa `chats/<id>.md` hẳn (strip `-`). Nếu `_active==id` thì xóa `_active` luôn. |
+
+Unknown chat subcommand -> `Unknown chat command 'X'. Valid: new, -<id>, list, close, delete -<id>.` rồi hiện bảng. `help`/`--help`/`-h` cũng hiện.
+
+### Quy tắc tiếp nối ngầm định
+
+Khi `_active` tồn tại, ở đầu MỌI lượt (kể cả chat thường không có /docstruct), agent phải đọc `_active` và `chats/<id>.md`, coi tin nhắn user là input thảo luận, cập nhật biên bản, và prefix trả lời bằng `[chat: <id>]`. Chỉ `chat close` mới thoát.
+
+================================================================================
+5. LỆNH `/docstruct init <mô tả dự án>`
 ================================================================================
 
 Khởi tạo cấu trúc tài liệu cho một dự án.
@@ -66,18 +157,14 @@ QUY TRÌNH BẮT BUỘC:
    - Các loại tài liệu đầu ra cần có (BRD, PRD, SAD...)
    - **Ngôn ngữ trả lời** — ngôn ngữ agent dùng khi hội thoại: `en` hoặc `vi`
    - **Ngôn ngữ tài liệu** — ngôn ngữ nội dung tài liệu: `en`, `vi`, hoặc
-     `vi-en` (định nghĩa tại Mục 8)
-3. **Đề xuất quy mô** — dựa trên dữ liệu quét, đề xuất một trong ba tier kèm lý do:
-   - **S** (dự án nhỏ, 1-2 người, MVP): 5–7 thư mục cốt lõi
-   - **M** (dự án trung bình, nhiều phân hệ): 8–10 thư mục
-   - **L** (sản phẩm đầy đủ, nhiều bên liên quan): đủ 11 thư mục chuẩn + assets
-4. **Hỏi vị trí lưu tài liệu (doc-root)** — user chọn:
+     `vi-en` (định nghĩa tại Mục 10)
+3. **Hỏi vị trí lưu tài liệu (doc-root)** — user chọn:
    - `docs/` (thư mục tài liệu truyền thống), hoặc
    - `.docstruct/docs/` (gói gọn trong workspace của skill)
-5. **Xác nhận dàn ý** — trình bày cây thư mục + danh sách file cụ thể, chờ user
+4. **Xác nhận dàn ý** — trình bày cây thư mục + danh sách file cụ thể, chờ user
    duyệt. Nếu dự án đã có tài liệu không theo schema, đề xuất luôn phương án sắp
    xếp lại (bảng mapping di chuyển) trong bước này.
-6. **Khởi tạo** — sau khi duyệt:
+5. **Khởi tạo** — sau khi duyệt:
    - Tạo `.docstruct/project-profile.yaml` và `.docstruct/schema.yaml`
      (từ template trong thư mục `templates/` của skill), bao gồm cả
      `language.response` và `language.documentation` đã chọn
@@ -91,7 +178,7 @@ VÍ DỤ:
 Không có mô tả: vẫn quét dự án hiện tại trước, rồi hỏi từ bước 2.
 
 ================================================================================
-4. LỆNH `/docstruct validate [phạm vi]`
+6. LỆNH `/docstruct validate [phạm vi]`
 ================================================================================
 
 Kiểm tra cấu trúc và chất lượng tài liệu hiện có.
@@ -100,7 +187,7 @@ QUY TRÌNH:
 
 1. **Xác định phạm vi** — từ tham số, hoặc mặc định kiểm tra toàn bộ: Cấu trúc,
    Nội dung, Thuật ngữ, Định dạng.
-2. **Đọc cấu hình** — `.docstruct/project-profile.yaml` (doc-root, tier) và
+2. **Đọc cấu hình** — `.docstruct/project-profile.yaml` (doc-root) và
    `.docstruct/schema.yaml` (cấu trúc chuẩn).
 3. **Kiểm tra:**
    - *Cấu trúc:* thư mục/file chuẩn còn đủ? README con còn đầy đủ?
@@ -121,17 +208,17 @@ TIÊU CHÍ MỨC ĐỘ NGHIÊM TRỌNG:
 
 VÍ DỤ:
 /docstruct validate
-/docstruct validate Chỉ kiểm tra cấu trúc thư mục và link trong 02-architecture
+/docstruct validate Chỉ kiểm tra cấu trúc thư mục và link trong 04-architecture
 
 ================================================================================
-5. LỆNH `/docstruct generate <loại tài liệu> <mô tả>`
+7. LỆNH `/docstruct generate <loại tài liệu> <mô tả>`
 ================================================================================
 
 Viết hoặc cập nhật một tài liệu hoàn chỉnh (BRD, PRD, SAD, FSD, Guide...).
 
 QUY TRÌNH:
 
-1. **Xác định loại tài liệu** — tra **Aggregation Matrix** (Mục 6) để biết cần
+1. **Xác định loại tài liệu** — tra **Aggregation Matrix** (Mục 8) để biết cần
    ghép block từ những thư mục nào.
 2. **Rà soát block có sẵn** — đọc các block nguồn; lập danh sách block **đã có**
    (tái sử dụng nguyên văn, KHÔNG viết lại) và block **còn thiếu**.
@@ -140,56 +227,54 @@ QUY TRÌNH:
 4. **Chờ user duyệt dàn ý** trước khi viết.
 5. **Viết** — ghép block có sẵn + viết bổ sung block thiếu vào đúng thư mục gốc
    (giữ SSOT); thay thế hoàn toàn nội dung lỗi thời và áp dụng quy tắc
-   "ghi trạng thái hiện tại" tại Mục 8; rồi tổng hợp thành file hoàn chỉnh tại
-   `07-deliverables/` (hoặc tương đương theo schema).
+   "ghi trạng thái hiện tại" tại Mục 10; rồi tổng hợp thành file hoàn chỉnh tại
+   `10-deliverables/` (hoặc tương đương theo schema).
 
 VÍ DỤ:
 /docstruct generate SAD Tài liệu kiến trúc hệ thống cho vòng duyệt khách hàng
 /docstruct generate PRD Bổ sung tính năng thanh toán vào PRD hiện tại
 
 ================================================================================
-6. AGGREGATION MATRIX — MA TRẬN TỔNG HỢP
+8. AGGREGATION MATRIX — MA TRẬN TỔNG HỢP
 ================================================================================
-
-Áp dụng cho tier L (điều chỉnh khi tier S/M cắt giảm thư mục):
 
 | Tài liệu         | Ghép từ các block                                                    |
 |------------------|----------------------------------------------------------------------|
-| BRD              | 01-overview + 06-business-docs                                       |
-| PRD              | 01-overview + 03-features + 06-business-docs + 08-quality-assurance  |
-| SAD              | 02-architecture + 04-security + 05-implementation-guide + 08-quality-assurance + 09-operations |
-| FSD              | 03-features + 02-architecture                                        |
-| SRD              | 04-security + 03-features                                            |
-| Proposal         | 01-overview + 06-business-docs                                       |
-| Test Plan        | 08-quality-assurance + 03-features + 04-security                     |
-| Runbook          | 09-operations + 05-implementation-guide + 02-architecture            |
-| User/Admin Guide | 10-enablement + 03-features + 01-overview                            |
+| BRD              | 01-overview + 02-business                                            |
+| PRD              | 01-overview + 03-features + 02-business + 07-quality                 |
+| SAD              | 04-architecture + 05-security + 06-implementation + 07-quality + 08-operations |
+| FSD              | 03-features + 04-architecture                                        |
+| SRD              | 05-security + 03-features                                            |
+| Proposal         | 01-overview + 02-business                                            |
+| Test Plan        | 07-quality + 03-features + 05-security                               |
+| Runbook          | 08-operations + 06-implementation + 04-architecture                  |
+| User/Admin Guide | 09-guides + 03-features + 01-overview                                |
 
 ================================================================================
-7. CẤU TRÚC MẶC ĐỊNH (TIER L)
+9. CẤU TRÚC CHUẨN (DUY NHẤT)
 ================================================================================
 
-Khi đề xuất tier L, dùng schema đầy đủ sau. Tier S/M cắt giảm theo hướng dẫn dưới.
+Cấu trúc duy nhất cho mọi dự án:
 
 docs/                        # hoặc .docstruct/docs/ tùy doc-root user chọn
 ├── 00-common/               # Glossary, Abbreviations, References
 ├── 01-overview/             # Problem Statement, Summary, Goals, Scope
-├── 02-architecture/         # System Overview, Components, Data Flow, API, Data Model
+├── 02-business/             # Value Prop, Market, Pricing, Risk/Legal, SLA, use-cases/
 ├── 03-features/             # Khối tính năng chi tiết, mỗi feature một nhóm block
-├── 04-security/             # Threat Model, Defense, Compliance, Privacy
-├── 05-implementation-guide/ # Deployment, Config, Integration, Migration, Operations
-├── 06-business-docs/        # Value Prop, Market, Pricing, Risk/Legal, SLA, use-cases/
-├── 07-deliverables/         # File tổng hợp: BRD, PRD, SAD, FSD...
-├── 08-quality-assurance/    # Test Strategy, Test Plans, UAT
-├── 09-operations/           # Runbook, Incident Response, DR/BCP
-├── 10-enablement/           # User Guide, Admin Guide, Training, FAQ
-└── assets/                  # Hình ảnh, sơ đồ, templates
+├── 04-architecture/         # System Overview, Components, Data Flow, API, Data Model
+├── 05-security/             # Threat Model, Defense, Compliance, Privacy
+├── 06-implementation/       # Deployment, Config, Integration, Migration
+├── 07-quality/              # Test Strategy, Test Plans, UAT
+├── 08-operations/           # Runbook, Incident Response, DR/BCP
+├── 09-guides/               # User Guide, Admin Guide, Training, FAQ
+├── 10-deliverables/         # File tổng hợp: BRD, PRD, SAD, FSD...
+└── 99-assets/               # Hình ảnh, sơ đồ, templates
 
---- PHÂN ĐỊNH `03-features` VÀ `06-business-docs/use-cases/` ---
+--- PHÂN ĐỊNH `03-features` VÀ `02-business/use-cases/` ---
 
 Hai thư mục dễ nhầm lẫn nhất — phân biệt bằng đối tượng đọc và độ chi tiết:
 
-|                    | 03-features                          | 06-business-docs/use-cases/                |
+|                    | 03-features                          | 02-business/use-cases/                |
 |--------------------|--------------------------------------|--------------------------------------------|
 | Nội dung           | User story + tiêu chí chấp nhận + tham chiếu kỹ thuật | Luồng end-to-end: luồng chính + mọi nhánh thay thế/ngoại lệ |
 | Đối tượng đọc      | Developer, tester                    | Khách hàng, BA, người viết test case       |
@@ -199,18 +284,11 @@ Hai thư mục dễ nhầm lẫn nhất — phân biệt bằng đối tượng 
 Một use case thường được bóc tách thành nhiều user story; mỗi story đặt link ngược
 về use case nguồn thay vì kể lại luồng.
 
-HƯỚNG DẪN CẮT GIẢM TIER S/M — giữ tối thiểu khối cốt lõi, ưu tiên theo thứ tự:
-
-| Tier      | Giữ                                                                  | Loại bỏ   |
-|-----------|----------------------------------------------------------------------|-----------|
-| S (5–7)   | 00-common, 01-overview, 02-architecture, 03-features, 07-deliverables (+ assets nếu cần) | Còn lại |
-| M (8–10)  | Tier S + 04-security + 05-implementation-guide (+ 08 hoặc 09 tùy nhu cầu) | 06, 09, 10 |
-
-Khi cắt giảm, cập nhật Aggregation Matrix tương ứng; tài liệu yêu cầu phần bị cắt
-thì ghi chú "N/A — ngoài phạm vi tài liệu" thay vì bỏ im lặng.
+Folder chưa cần dùng có thể giữ nguyên `README.md` và ghi chú ngắn
+`> Out of scope for this project` — `validate` sẽ không báo Critical.
 
 ================================================================================
-8. QUY TẮC BIÊN SOẠN
+10. QUY TẮC BIÊN SOẠN
 ================================================================================
 
 1. **Single Source of Truth:** mỗi nội dung chỉ viết một lần tại một file duy nhất;
@@ -248,7 +326,7 @@ thì ghi chú "N/A — ngoài phạm vi tài liệu" thay vì bỏ im lặng.
 4. **Không trùng lặp:** kiểm tra glossary trước khi định nghĩa thuật ngữ mới.
 5. **Tên file:** kebab-case kèm tiền tố số thể hiện thứ tự đọc — ví dụ
    `01-problem-statement.md`.
-6. **Hình ảnh/sơ đồ:** lưu tại `assets/`, tham chiếu bằng đường dẫn tương đối;
+6. **Hình ảnh/sơ đồ:** lưu tại `99-assets/`, tham chiếu bằng đường dẫn tương đối;
    không nhúng base64 inline.
 7. **Vòng đời block:** mỗi block có trạng thái `draft → review → approved`, quản
    lý tại `.docstruct/status/`; chỉ block `approved` được đem vào tài liệu tổng

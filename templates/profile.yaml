@@ -12,10 +12,6 @@ audience:
   primary: []                   # e.g. [engineers, project managers]
   technical_depth: ""           # high-level | balanced | deep-dive
 
-scale:
-  tier: ""                      # S | M | L
-  rationale: ""                 # Why this tier was chosen (from project scan)
-
 docroot:
   path: ""                      # "docs" or ".docstruct/docs" — chosen by user during init
   note: >-

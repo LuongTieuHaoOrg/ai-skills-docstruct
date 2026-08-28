@@ -12,7 +12,16 @@
 docs/
 ├── 00-common/               # Glossary, abbreviations, references
 ├── 01-overview/             # Overview: problem, goals, scope
-├── ...
+├── 02-business/             # Value Prop, Market, Pricing, Risk/Legal, SLA, use-cases/
+├── 03-features/             # Detailed feature blocks, one group per feature
+├── 04-architecture/         # System Overview, Components, Data Flow, API, Data Model
+├── 05-security/             # Threat Model, Defense, Compliance, Privacy
+├── 06-implementation/       # Deployment, Config, Integration, Migration
+├── 07-quality/              # Test Strategy, Test Plans, UAT
+├── 08-operations/           # Runbook, Incident Response, DR/BCP
+├── 09-guides/               # User Guide, Admin Guide, Training, FAQ
+├── 10-deliverables/         # Aggregated files: BRD, PRD, SAD, FSD...
+└── 99-assets/               # Images, diagrams, templates
 ```
 
 <Folder tree from the approved schema — fill from .docstruct/schema.yaml>
@@ -24,22 +33,30 @@ Read in the following order, from high-level to details:
 | Step | Folder | What you will learn |
 |------|--------|---------------------|
 | 1 | 01-overview | What the project is and what problem it solves |
-| 2 | 02-architecture | How the system is designed |
-| 3 | 03-features | How each feature works |
-| ... | ... | ... |
+| 2 | 02-business | Business context, value proposition and end-to-end flows |
+| 3 | 03-features | How each feature works (user stories + acceptance criteria) |
+| 4 | 04-architecture | How the system is designed |
+| 5 | 05-security | Threats, defenses and compliance |
+| 6 | 06-implementation | How to deploy, configure and integrate |
+| 7 | 07-quality | How quality is assured (test strategy, plans) |
+| 8 | 08-operations | How to run and recover the system |
+| 9 | 09-guides | How to use the system (user/admin/training) |
+| 10 | 10-deliverables | Complete assembled documents (BRD/SAD...) |
+
+> `00-common` (glossary) is a reference to consult at any step. `99-assets` holds images/diagrams.
 
 ## Quick Lookup
 
 | If you want to... | See |
 |--------------------|-----|
 | Understand context & terminology | 00-common/glossary.md |
-| Get the big-picture architecture | 02-architecture/ |
-| Read end-to-end business flows | 06-business-docs/use-cases/ |
-| Deploy the system | 05-implementation-guide/ |
-| Read full documents (BRD/SAD...) | 07-deliverables/ |
+| Get the big-picture architecture | 04-architecture/ |
+| Read end-to-end business flows | 02-business/use-cases/ |
+| Deploy the system | 06-implementation/ |
+| Read full documents (BRD/SAD...) | 10-deliverables/ |
 
 ## Conventions
 
-- Each file is an atomic content block; complete documents under `07-deliverables/` are aggregations.
+- Each file is an atomic content block; complete documents under `10-deliverables/` are aggregations.
 - Block lifecycle: `draft → review → approved` (tracked in `.docstruct/status/`).
 - Quality review reports are stored in `issues/`.
