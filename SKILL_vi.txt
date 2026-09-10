@@ -6,11 +6,11 @@ bản chính thức để agent thực thi là SKILL.md (tiếng Anh).
 
 --- FRONTMATTER ---
 name: docstruct
-description: Quản lý, kiểm tra và tạo cấu trúc tài liệu dự án theo mô hình Atomic
+description: Quản lý và tạo cấu trúc tài liệu dự án theo mô hình Atomic
 Content Blocks. Kích hoạt khi user muốn khởi tạo cấu trúc tài liệu cho dự án mới,
-tổ chức/refactor tài liệu đang tồn tại, kiểm tra chất lượng docs, hoặc tổng hợp
-tài liệu hoàn chỉnh (BRD, PRD, SAD, FSD...) từ các khối nội dung có sẵn, hoặc thảo
-luận theo phiên. Gõ /docstruct không tham số để xem cấu trúc hiện tại và hướng dẫn.
+tổ chức/refactor tài liệu đang tồn tại, tổng hợp tài liệu hoàn chỉnh (BRD, PRD,
+SAD, FSD...) hoặc quản lý bộ nhớ kiến thức project qua remember/knowledge. Gõ
+/docstruct không tham số để xem cấu trúc hiện tại và hướng dẫn.
 
 ================================================================================
 1. TỔNG QUAN
@@ -26,7 +26,26 @@ SAD, FSD...).
 - **Nguyên tử:** mỗi block là một đối tượng riêng — dễ phân công, theo dõi trạng
   thái, quản lý phiên bản.
 - **Linh hoạt:** tài liệu đầu ra chỉ là các "View" được tổng hợp từ cùng tập block
-  gốc theo **Aggregation Matrix** (Mục 8).
+  gốc theo **Aggregation Matrix** (Mục 7).
+- **Bộ nhớ kiến thức:** fact của project (business, technical, team...) lưu thành
+  file nhỏ theo domain dưới `.docstruct/knowledge/` và load chọn lọc như RAG.
+
+================================================================================
+1.1 KNOWLEDGE NHƯ RAG CHỌN LỌC (không cần vector DB)
+================================================================================
+
+Vì không có vector search, knowledge được tổ chức để truy xuất qua filename + index:
+
+- Mỗi fact lưu trong file đặt tên theo domain: `business-*.md`, `technical-*.md`,
+  `team-*.md`, `common-*.md`, `security-*.md`... Agent tự chọn tên phù hợp nhất
+  với nội dung để có thể tìm mà không cần load toàn bộ.
+- `.docstruct/knowledge/_index.md` là bảng tra duy nhất: mỗi file một dòng
+  `file | domain | summary | tags`. Agent chỉ đọc `_index.md` (nhỏ) để quyết định
+  file nào cần load cho task hiện tại, rồi chỉ load những file đó. Không load toàn
+  bộ `knowledge/` mặc định.
+- Dùng `_index.md` trước mọi lượt `init`, `generate` cần context:
+  đọc `_index`, chọn dòng có domain/tags khớp task (vd business cho BRD, technical
+  cho SAD), chỉ load file khớp. Knowledge thắng default khi xung đột.
 
 ================================================================================
 2. WORKSPACE `.docstruct/`
@@ -37,24 +56,32 @@ Skill lưu toàn bộ cấu hình và trạng thái vào `.docstruct/` tại g�
 .docstruct/
 ├── project-profile.yaml   # Hồ sơ dự án: loại, audience, doc-root, cấu hình ngôn ngữ
 ├── schema.yaml            # Cây thư mục đã duyệt + ma trận tổng hợp
-├── status/                # Trạng thái từng block: draft / review / approved
-└── chats/                 # Phiên thảo luận (xem Mục 4)
-    ├── _active            # File text chứa id phiên đang active, nếu có
-    └── <id>.md            # Mỗi phiên một file, id = [a-z0-9]{6-8}
+├── status/                # Trạng thái: DRAFT | UPDATING | RELEASED
+├── knowledge/             # Bộ nhớ kiến thức - RAG chọn lọc (xem Mục 4)
+│   ├── _index.md          # Tra cứu: file | domain | summary | tags
+│   ├── business-*.md
+│   ├── technical-*.md
+│   ├── team-*.md
+│   └── common-*.md
+└── elicitation/           # Q&A tạm cho generate (xem Mục 6)
+    └── <sanitized-path>.md
 
 > QUAN TRỌNG: `project-profile.yaml` ghi rõ **doc-root** — vị trí lưu tài liệu do
-> user chọn khi chạy `init`. Mọi lệnh (validate, generate, chat) phải đọc config
-> này trước khi thao tác. Tuyệt đối không suy đoán doc-root.
+> user chọn khi chạy `init`. Mọi lệnh (generate, remember, knowledge) phải
+> đọc config này trước khi thao tác. Tuyệt đối không suy đoán doc-root.
 
 > CẤU HÌNH NGÔN NGỮ: `project-profile.yaml` cũng ghi **ngôn ngữ trả lời**
 > (`language.response`) và **ngôn ngữ tài liệu** (`language.documentation`). Đây
-> là nguồn sự thật duy nhất cho mọi quyết định giao tiếp và nội dung — xem Mục 10.
+> là nguồn sự thật duy nhất cho mọi quyết định giao tiếp và nội dung — xem Mục 9.
 > Nếu trống hoặc thiếu, phải hỏi user trước khi chạy lệnh nào.
 
-> CHẾ ĐỘ CHAT NGẦM ĐỊNH: Ở đầu MỌI lượt (dù user có gõ /docstruct hay không), kiểm
-> tra `.docstruct/chats/_active`. Nếu tồn tại và `chats/<id>.md` tồn tại, coi tin
-> nhắn của user là tiếp nối phiên đó: cập nhật biên bản theo Mục 4 và prefix trả
-> lời bằng `[chat: <id>]`. `chat close` xóa `_active` để thoát.
+> BỘ NHỚ RAG: Trước mọi lượt `init`, `generate` cần context,
+> đọc `.docstruct/knowledge/_index.md` (nếu tồn tại), rồi chỉ load file knowledge
+> có domain/tags khớp task. Dùng knowledge làm ground truth khi xung đột. Xem Mục 4.
+
+> ELICITATION & STATUS: `generate` lưu Q&A tạm tại `.docstruct/elicitation/` và
+> đánh trạng thái mỗi file `DRAFT | UPDATING | RELEASED` (frontmatter `status:` +
+> `.docstruct/status/`). Xem Mục 6.
 
 ================================================================================
 3. LỆNH `/docstruct` (không tham số) - HELP & STATUS DASHBOARD
@@ -67,76 +94,81 @@ thực thi workflow. Thay vào đó hiển thị dashboard help:
    tại, đọc `docroot` và liệt kê cây thư mục thực tế dưới doc-root (mỗi folder
    00-common -> 99-assets: tồn tại/thiếu, số file). Nếu chưa init, hiện
    `Not initialized` và preview cây chuẩn từ Mục 9.
-2. **Kiểm tra chat active** - nếu `.docstruct/chats/_active` tồn tại, hiện
-   `Active chat: <id> (topic)` và tóm tắt một dòng từ `chats/<id>.md`.
+2. **Kiểm tra knowledge** - nếu `.docstruct/knowledge/_index.md` tồn tại, hiện
+   `Knowledge: N files` và 5 dòng đầu của index; nếu không, hiện `Knowledge: (empty)`.
 3. **Tóm tắt lệnh:**
 
    | Lệnh | Khi nào dùng | Ví dụ |
    |------|-------------|-------|
    | `/docstruct init <mô tả>` | Khởi tạo cấu trúc 12 folder | `/docstruct init E-commerce Next.js + PostgreSQL` |
-   | `/docstruct validate [phạm vi]` | Audit Structure/Content/Terminology/Formatting | `/docstruct validate 04-architecture` |
-   | `/docstruct generate <loại> <mô tả>` | Tổng hợp tài liệu BRD/PRD/SAD... | `/docstruct generate SAD customer review` |
-   | `/docstruct chat new [topic]` | Bắt đầu phiên thảo luận (implicit) | `/docstruct chat new Data model` |
-   | `/docstruct chat -<id>` | Mở lại phiên `<id>` (bỏ dấu `-`) | `/docstruct chat -a1b2c3` |
-   | `/docstruct chat list` | Liệt kê phiên | `/docstruct chat list` |
-   | `/docstruct chat close` | Thoát chat mode | `/docstruct chat close` |
-   | `/docstruct chat delete -<id>` | Xóa phiên `<id>` hẳn | `/docstruct chat delete -a1b2c3` |
+   | `/docstruct generate` | Xây file tiếp theo theo thứ tự (hỏi theo role) | `/docstruct generate` |
+   | `/docstruct generate <file>` | Tập trung vào file chỉ định | `/docstruct generate 02-business/01-value-prop.md` |
+   | `/docstruct remember <text tự do>` | Ghi kiến thức (phân tích -> confirm -> lưu) | `/docstruct remember STID là công ty` |
+   | `/docstruct knowledge` | Liệt kê knowledge | `/docstruct knowledge` |
 
-4. **Hiện Aggregation Matrix rút gọn** - BRD/PRD/SAD/FSD từ Mục 8.
+4. **Hiện Aggregation Matrix rút gọn** - BRD/PRD/SAD/FSD từ Mục 7.
 5. **Không tạo/sửa file.** Nếu token đầu không khớp (vd `/docstruct foo`), prefix
-   `Unknown command 'foo'. Valid: init, validate, generate, chat.` và gợi ý gần đúng.
-   Alias `help`, `--help`, `-h` cũng hiện dashboard. So khớp case-insensitive.
+   `Unknown command 'foo'. Valid: init, generate, remember, knowledge.` và gợi
+   ý gần đúng. Alias `help`, `--help`, `-h` cũng hiện dashboard. So khớp
+   case-insensitive.
 
 ================================================================================
-4. LỆNH `/docstruct chat ...` - PHIÊN THẢO LUẬN
+4. LỆNH `/docstruct remember / knowledge` - BỘ NHỚ KIẾN THỨC (RAG CHỌN LỌC)
 ================================================================================
 
-Phiên thảo luận lưu biên bản (quyết định, câu hỏi mở, việc tiếp theo), không phải
-transcript thô. Tồn tại `.docstruct/chats/_active` nghĩa là implicit chat mode đang
-bật (xem Mục 2): mọi lượt user tiếp theo - kể cả không có prefix /docstruct - đều
-được coi là tiếp nối phiên đó cho đến `chat close`.
+File kiến thức là fact chuẩn mà agent phải nhớ và tuân theo. Lưu thành file nhỏ
+theo domain để load chọn lọc mà không cần đọc toàn bộ.
 
 ### Lưu trữ
 
-.docstruct/chats/
-├── _active          # chứa id active, vd "a1b2c3" - không tồn tại = không active
-└── <id>.md          # id = [a-z0-9]{6-8}, mỗi phiên một file
+.docstruct/knowledge/
+├── _index.md          # file | domain | summary | tags - chỉ file này đọc mặc định
+├── business-*.md
+├── technical-*.md
+├── team-*.md
+├── common-*.md
+└── security-*.md
 
-`_active` là nguồn duy nhất xác định phiên active. Không dùng field `status`. Xóa
-phiên là xóa hẳn file.
+`_index.md` format (mỗi file một dòng):
 
-### Schema file `chats/<id>.md`
+| file | domain | summary | tags |
+|------|--------|---------|------|
+| business-stid-team.md | business | STID là công ty, PM là Hảo, member Hảo/Vu/Dai | stid, team, pm |
+| technical-stack.md | technical | Stack: Next.js + PostgreSQL | nextjs, postgres |
 
----
-id: abc123
-topic: "Data model cho 04-architecture"
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
-related_paths: [04-architecture/03-data-model.md]
----
-# Quyết định
-# Câu hỏi mở
-# Việc tiếp theo
-# Thuật ngữ mới (để sync vào 00-common/glossary.md)
+Domain: `business`, `technical`, `team`, `common`, `security`, `quality`,
+`operations`, `guides` - chọn gần nhất. Agent tự chọn tên file khớp nội dung nhất
+(vd `business-stid-team.md` cho fact về team) để tìm mà không load toàn bộ. Mỗi
+file giữ 1-3 fact; nếu user nói nhiều domain thì tách thành nhiều file.
 
-Mỗi lượt thảo luận agent đọc biên bản cũ, merge tóm tắt mới vào 3 mục trên, cập
-nhật `updated` và `related_paths`.
+### Load chọn lọc (RAG không vector DB)
+
+Trước mọi lượt `init`, `generate` cần context:
+
+1. Đọc `knowledge/_index.md` nếu tồn tại (nhỏ, luôn đọc).
+2. Chỉ chọn dòng có `domain`/`tags`/`summary` khớp task hiện tại (vd `business` cho
+   BRD/Proposal, `technical`+`architecture` cho SAD/FSD, `team` cho task liên quan
+   con người).
+3. Chỉ load file knowledge khớp. KHÔNG load toàn bộ `knowledge/`.
+
+Knowledge là ground truth: khi knowledge xung đột với code/README scan, ưu tiên
+knowledge.
 
 ### Subcommands
 
 | Subcommand | Hành vi |
 |------------|---------|
-| `chat new [topic]` | Tạo id `[a-z0-9]{6-8}` (nếu gõ `-abc` thì strip `-` -> `abc`). Tạo `chats/<id>.md` với `topic` (rỗng thì lấy tin nhắn đầu), ghi `_active=id`, trả `[chat: <id>] Created - mọi tin nhắn tiếp theo sẽ ghi vào đây. Dùng /docstruct chat close để thoát.` |
-| `chat -<id>` | Mở lại: id là token bỏ dấu `-` (vd `-a1b2c3` -> `a1b2c3`). Nếu `chats/<id>.md` tồn tại, ghi `_active=id` và trả tóm tắt biên bản. Không tồn tại -> báo lỗi + `chat list`. |
-| `chat list` | Liệt kê `chats/*.md` (trừ `_active`) dạng bảng `id | topic | updated | decisions#`, highlight `_active`. Read-only. |
-| `chat close` | Xóa file `_active`. Trả `[chat: <id>] Closed - đã thoát implicit mode. Biên bản giữ tại chats/<id>.md.` KHÔNG xóa minutes. |
-| `chat delete -<id>` | Xóa `chats/<id>.md` hẳn (strip `-`). Nếu `_active==id` thì xóa `_active` luôn. |
+| `remember <text tự do>` | **Phân tích -> confirm -> lưu.** Parse text, tách fact riêng, viết lại mỗi fact thành câu chuẩn (văn current-state Mục 9, không lịch sử), chọn tên file domain cho mỗi fact, hiện preview bảng `file | nội dung chuẩn` + dòng `_index` sẽ thêm. Hỏi `Confirm? (yes / edit <sửa>)`. Chỉ khi `yes` (hoặc sau `edit` và yes lại) mới ghi file và cập nhật `_index.md`. Nếu user nói `edit`, render lại preview đã sửa và hỏi lại. `knowledge <text>` là alias của lệnh này. Không giữ backward. |
+| `knowledge` | **Liệt kê** (không tham số). Đọc `_index.md` và render bảng + số file. Nếu `_index` thiếu nhưng file tồn tại, rebuild từ tên file. Read-only. |
 
-Unknown chat subcommand -> `Unknown chat command 'X'. Valid: new, -<id>, list, close, delete -<id>.` rồi hiện bảng. `help`/`--help`/`-h` cũng hiện.
+Unknown subcommand cho nhóm này -> `Unknown command 'X'. Valid: remember <text>, knowledge.` rồi hiện bảng. `help`/`--help`/`-h` cũng hiện.
 
-### Quy tắc tiếp nối ngầm định
+### Ví dụ
 
-Khi `_active` tồn tại, ở đầu MỌI lượt (kể cả chat thường không có /docstruct), agent phải đọc `_active` và `chats/<id>.md`, coi tin nhắn user là input thảo luận, cập nhật biên bản, và prefix trả lời bằng `[chat: <id>]`. Chỉ `chat close` mới thoát.
+```
+/docstruct remember STID là công ty tôi, tôi là PM, member gồm Hảo (tôi), Vu (Backend) và Dai (Frontend)
+/docstruct knowledge
+```
 
 ================================================================================
 5. LỆNH `/docstruct init <mô tả dự án>`
@@ -156,8 +188,8 @@ QUY TRÌNH BẮT BUỘC:
    - Yêu cầu bảo mật/tuân thủ đặc thù (nếu có)
    - Các loại tài liệu đầu ra cần có (BRD, PRD, SAD...)
    - **Ngôn ngữ trả lời** — ngôn ngữ agent dùng khi hội thoại: `en` hoặc `vi`
-   - **Ngôn ngữ tài liệu** — ngôn ngữ nội dung tài liệu: `en`, `vi`, hoặc
-     `vi-en` (định nghĩa tại Mục 10)
+     - **Ngôn ngữ tài liệu** — ngôn ngữ nội dung tài liệu: `en`, `vi`, hoặc
+       `vi-en` (định nghĩa tại Mục 10)
 3. **Hỏi vị trí lưu tài liệu (doc-root)** — user chọn:
    - `docs/` (thư mục tài liệu truyền thống), hoặc
    - `.docstruct/docs/` (gói gọn trong workspace của skill)
@@ -178,64 +210,80 @@ VÍ DỤ:
 Không có mô tả: vẫn quét dự án hiện tại trước, rồi hỏi từ bước 2.
 
 ================================================================================
-6. LỆNH `/docstruct validate [phạm vi]`
+6. LỆNH `/docstruct generate` / `generate <file>` - XÂY DOCS THEO THỨ TỰ (HỎI THEO ROLE)
 ================================================================================
 
-Kiểm tra cấu trúc và chất lượng tài liệu hiện có.
+Xây tài liệu tuần tự từ tổng quan -> business -> kỹ thuật. Hai chế độ:
 
-QUY TRÌNH:
+- `/docstruct generate` — tìm file thiếu/trống tiếp theo theo thứ tự chuẩn và xây nó.
+- `/docstruct generate <file>` — tập trung vào file chỉ định (vd `02-business/01-value-prop.md`
+  hoặc `10-deliverables/01-BRD.md`) để tạo hoặc điều chỉnh. Nếu file đã `RELEASED`,
+  cảnh báo và hỏi có update không.
 
-1. **Xác định phạm vi** — từ tham số, hoặc mặc định kiểm tra toàn bộ: Cấu trúc,
-   Nội dung, Thuật ngữ, Định dạng.
-2. **Đọc cấu hình** — `.docstruct/project-profile.yaml` (doc-root) và
-   `.docstruct/schema.yaml` (cấu trúc chuẩn).
-3. **Kiểm tra:**
-   - *Cấu trúc:* thư mục/file chuẩn còn đủ? README con còn đầy đủ?
-   - *Nội dung:* còn `[PLACEHOLDER]`, `TODO`, mục rỗng? Các mục chính đã điền?
-   - *Thuật ngữ:* thuật ngữ mới đã định nghĩa trong glossary?
-   - *Định dạng:* link còn hoạt động? Tên file đúng convention
-     (kebab-case + tiền tố số)?
-4. **Ghi báo cáo** vào `<doc-root>/issues/docstruct-review-YYYY-MM-DD.md`
-   theo bảng mức độ bên dưới.
+### Thứ tự chuẩn
 
-TIÊU CHÍ MỨC ĐỘ NGHIÊM TRỌNG:
+Thứ tự là `00-common -> 01-overview -> 02-business -> 03-features -> 04-architecture
+-> 05-security -> 06-implementation -> 07-quality -> 08-operations -> 09-guides
+-> 10-deliverables -> 99-assets` như trong `schema.yaml` và Mục 8. Trong mỗi folder,
+file xếp theo prefix số. `generate` không tham số quét thứ tự này và chọn file đầu
+tiên thiếu/trống (size 0 hoặc chỉ placeholder). Nếu tất cả đã `RELEASED`, trả
+`Tất cả đã hoàn thiện.`.
 
-| Mức        | Định nghĩa                                   | Ví dụ                                              |
-|------------|----------------------------------------------|----------------------------------------------------|
-| Critical   | Sai lệch cấu trúc, gãy hệ thống tài liệu      | Thiếu thư mục chuẩn; link hỏng; file sai vị trí    |
-| Major      | Nội dung thiếu sót, ảnh hưởng người đọc       | Còn [PLACEHOLDER]/TODO; mục lớn trống; thiếu README|
-| Minor      | Lệch convention, không cản trở sử dụng        | Thuật ngữ chưa vào glossary; sai kebab-case; thiếu tiền tố số |
+### Lưu elicitation
+
+Q&A tạm lưu tại `.docstruct/elicitation/<sanitized-path>.md` (vd
+`02-business-01-value-prop.md`) để đỡ context. Chỉ đọc khi cần trong `generate`.
+Sau khi xong file chính, hỏi user giữ hay xóa file elicitation.
+
+### Trạng thái
+
+Mỗi file docs có `status:` ở frontmatter và mirror tại `.docstruct/status/<path>`:
+
+- `DRAFT` — file mới hoàn toàn, version đầu tiên.
+- `UPDATING` — đã có nội dung tham khảo và đang chỉnh sửa.
+- `RELEASED` — đã hoàn thiện, có thể dùng làm cơ sở cho file khác, không sửa.
+  Nếu `generate <file>` nhắm vào `RELEASED`, báo `File đã RELEASED` và hỏi
+  `Update? (yes/no)`. Nếu `yes`, đổi thành `UPDATING` rồi mới sửa.
+
+Không giữ backward: mọi tạo mới/điều chỉnh đều coi như version đầu tiên (Mục 9).
+
+### QUY TRÌNH
+
+1. **RAG chọn lọc** — đọc `knowledge/_index.md` (nếu có), chọn dòng có
+   domain/tags khớp file đích (`business` cho BRD, `technical`+`architecture` cho
+   SAD, `team` cho người), chỉ load file khớp.
+2. **Xác định đích:**
+   - Nếu có `<file>`: chuẩn hóa (thêm `.md` nếu thiếu, resolve theo doc-root),
+     kiểm tra trong cây chuẩn. Nếu `RELEASED`, cảnh báo và hỏi update như trên.
+   - Nếu không có `<file>`: quét thứ tự chuẩn, chọn file thiếu/trống đầu tiên.
+     Nếu không còn, trả `Tất cả đã hoàn thiện.`
+   - Đọc nội dung hiện có (nếu `UPDATING`) và file lân cận cùng folder + glossary.
+3. **Hỏi theo role (linh hoạt):**
+   - Hỏi role trước: `Bạn ở vai trò nào với file này? (customer / sales / BA / dev / PM)
+     — bạn nắm gì nhất?` Lưu vào `elicitation/<target>.md`.
+   - Sinh **~5 câu hỏi** dựa trên `role + domain file` (vd `02-business/*` với
+     customer -> market/pain/SLA/metrics; `04-architecture/*` với customer -> chỉ
+     hỏi flow/business rule, với dev mới hỏi endpoint/schema/NFR/diagram). **Không
+     hỏi khách hàng về code.** Append Q&A vào elicitation file.
+   - Phân tích: kiểm tra field bắt buộc của file đích (theo schema) còn thiếu gì.
+     Nếu thiếu, hỏi tiếp 3-5 câu bổ sung, append, lặp đến khi đủ.
+4. **Đề xuất outline** — liệt kê section cho file đích, ghi chú nguồn
+   (block/folder và file knowledge nào). Chờ duyệt.
+5. **Viết** — tạo/cập nhật file đích trong folder chuẩn (kebab-case + prefix số,
+   Mục 9) bằng văn current-state (Mục 9, không backward). Cập nhật `status:`
+   thành `DRAFT` hoặc `UPDATING`. Nếu có fact mới, cập nhật `knowledge/` nếu cần.
+6. **Dọn elicitation** — hỏi `Giữ file elicitation để tra cứu hay xóa? (keep / delete)`.
+7. **Confirm & đánh trạng thái** — hỏi `Đánh trạng thái file là? (DRAFT / UPDATING / RELEASED)`.
+   Mặc định `RELEASED` nếu user nói đã xong. Cập nhật frontmatter và
+   `.docstruct/status/<path>`. `RELEASED` mới được tham chiếu bởi `generate` sau.
 
 VÍ DỤ:
-/docstruct validate
-/docstruct validate Chỉ kiểm tra cấu trúc thư mục và link trong 04-architecture
+/docstruct generate
+/docstruct generate 02-business/01-value-prop.md
+/docstruct generate 10-deliverables/01-BRD.md
 
 ================================================================================
-7. LỆNH `/docstruct generate <loại tài liệu> <mô tả>`
-================================================================================
-
-Viết hoặc cập nhật một tài liệu hoàn chỉnh (BRD, PRD, SAD, FSD, Guide...).
-
-QUY TRÌNH:
-
-1. **Xác định loại tài liệu** — tra **Aggregation Matrix** (Mục 8) để biết cần
-   ghép block từ những thư mục nào.
-2. **Rà soát block có sẵn** — đọc các block nguồn; lập danh sách block **đã có**
-   (tái sử dụng nguyên văn, KHÔNG viết lại) và block **còn thiếu**.
-3. **Đề xuất dàn ý** — liệt kê mục lớn/nhỏ, ghi chú nguồn từng phần (block nào,
-   thư mục nào) và phần cần viết mới.
-4. **Chờ user duyệt dàn ý** trước khi viết.
-5. **Viết** — ghép block có sẵn + viết bổ sung block thiếu vào đúng thư mục gốc
-   (giữ SSOT); thay thế hoàn toàn nội dung lỗi thời và áp dụng quy tắc
-   "ghi trạng thái hiện tại" tại Mục 10; rồi tổng hợp thành file hoàn chỉnh tại
-   `10-deliverables/` (hoặc tương đương theo schema).
-
-VÍ DỤ:
-/docstruct generate SAD Tài liệu kiến trúc hệ thống cho vòng duyệt khách hàng
-/docstruct generate PRD Bổ sung tính năng thanh toán vào PRD hiện tại
-
-================================================================================
-8. AGGREGATION MATRIX — MA TRẬN TỔNG HỢP
+7. AGGREGATION MATRIX — MA TRẬN TỔNG HỢP
 ================================================================================
 
 | Tài liệu         | Ghép từ các block                                                    |
@@ -251,24 +299,26 @@ VÍ DỤ:
 | User/Admin Guide | 09-guides + 03-features + 01-overview                                |
 
 ================================================================================
-9. CẤU TRÚC CHUẨN (DUY NHẤT)
+8. CẤU TRÚC CHUẨN (DUY NHẤT)
 ================================================================================
 
 Cấu trúc duy nhất cho mọi dự án:
 
 docs/                        # hoặc .docstruct/docs/ tùy doc-root user chọn
-├── 00-common/               # Glossary, Abbreviations, References
-├── 01-overview/             # Problem Statement, Summary, Goals, Scope
-├── 02-business/             # Value Prop, Market, Pricing, Risk/Legal, SLA, use-cases/
-├── 03-features/             # Khối tính năng chi tiết, mỗi feature một nhóm block
-├── 04-architecture/         # System Overview, Components, Data Flow, API, Data Model
-├── 05-security/             # Threat Model, Defense, Compliance, Privacy
-├── 06-implementation/       # Deployment, Config, Integration, Migration
-├── 07-quality/              # Test Strategy, Test Plans, UAT
-├── 08-operations/           # Runbook, Incident Response, DR/BCP
-├── 09-guides/               # User Guide, Admin Guide, Training, FAQ
-├── 10-deliverables/         # File tổng hợp: BRD, PRD, SAD, FSD...
+├── 00-common/               # 01-glossary.md, 02-abbreviations.md, 03-references.md, 04-conventions.md, 05-traceability.md (auto)
+├── 01-overview/             # 01-problem-statement.md, 02-vision.md, 03-goals.md, 04-scope.md, 05-stakeholders.md, 06-constraints.md, 07-roadmap.md (Version|Goal|Target|Status)
+├── 02-business/             # 01-value-proposition.md, 02-market-analysis.md, 03-business-model.md, 04-pricing.md, 05-sla.md, 06-risk-legal.md, use-cases/, change-requests/CR-*.md
+├── 03-features/             # 01-feature-catalog.md, 04-dependencies.md, features/<feature>/ 01-overview.md, 02-user-stories.md, 03-acceptance-criteria.md
+├── 04-architecture/         # 01-system-overview.md, 02-components.md, 03-data-flow.md, 04-api-spec.md, 05-data-model.md, 06-tech-stack.md, 07-decisions-adr.md
+├── 05-security/             # 01-threat-model.md, 02-defense.md, 03-compliance.md, 04-privacy.md, 05-authz.md
+├── 06-implementation/       # 01-deployment.md, 02-configuration.md, 03-integration.md, 04-migration.md, 05-development-guide.md
+├── 07-quality/              # 01-test-strategy.md, 02-test-plan.md, 03-test-cases.md, 04-uat.md, 05-quality-metrics.md
+├── 08-operations/           # 01-runbook.md, 02-incident-response.md, 03-dr-bcp.md, 04-monitoring.md, 05-support.md
+├── 09-guides/               # 01-user-guide.md, 02-admin-guide.md, 03-training.md, 04-faq.md, 05-onboarding.md
+├── 10-deliverables/         # 01-BRD.md, 02-PRD.md, 03-SAD.md, 04-FSD.md, 05-SRD.md, 06-Proposal.md, 07-TestPlan.md, 08-Runbook.md, 09-UserAdminGuide.md (placeholder với headings riêng + Ref link, không giống nhau)
 └── 99-assets/               # Hình ảnh, sơ đồ, templates
+
+`init` tạo đủ folder/file trên; mỗi `10-deliverables/*.md` là placeholder với headings riêng (vd BRD: Business Goals/Stakeholders/Requirements; SAD: Components/Data Flow/Security/Deployment) kèm mô tả 1 dòng và `Ref: ../01-overview/...` tới block nguồn — không phải template y nhau. `00-common/05-traceability.md` tự sinh bởi `generate` từ `status: RELEASED` + `knowledge/_index.md`; `07-roadmap.md` đơn giản Version|Goal|Target|Status (bugfix không lên roadmap, lưu tại `change-requests/` + `07-quality/05-quality-metrics.md`); `change-requests/CR-*.md` lưu mỗi yêu cầu khách theo timestamp.
 
 --- PHÂN ĐỊNH `03-features` VÀ `02-business/use-cases/` ---
 
@@ -285,17 +335,17 @@ Một use case thường được bóc tách thành nhiều user story; mỗi st
 về use case nguồn thay vì kể lại luồng.
 
 Folder chưa cần dùng có thể giữ nguyên `README.md` và ghi chú ngắn
-`> Out of scope for this project` — `validate` sẽ không báo Critical.
+`> Out of scope for this project`.
 
 ================================================================================
-10. QUY TẮC BIÊN SOẠN
+9. QUY TẮC BIÊN SOẠN
 ================================================================================
 
 1. **Single Source of Truth:** mỗi nội dung chỉ viết một lần tại một file duy nhất;
    tài liệu tổng hợp chỉ ghép, không sao chép nội dung.
 2. **Cấu hình ngôn ngữ** — đọc từ `project-profile.yaml`
    (`language.response`, `language.documentation`):
-   - **Phản hồi hội thoại** (câu hỏi làm rõ, báo cáo validate, đề xuất dàn ý...)
+   - **Phản hồi hội thoại** (câu hỏi làm rõ, Q&A elicitation, đề xuất dàn ý...)
      dùng `language.response`.
    - **Nội dung tài liệu** dùng `language.documentation`, định nghĩa:
 
@@ -310,11 +360,14 @@ Folder chưa cần dùng có thể giữ nguyên `README.md` và ghi chú ngắn
      tra cứu thêm.
    - **Fallback:** nếu cấu hình ngôn ngữ trống hoặc thiếu → PHẢI hỏi user quyết
      định trước khi chạy lệnh nào. Tuyệt đối không tự suy đoán mặc định.
-3. **Ghi trạng thái hiện tại, không ghi thay đổi:** khi tạo mới hoặc cập nhật
-   block/tài liệu, luôn viết nội dung cuối cùng như thể viết lại từ đầu hôm nay.
+3. **Ghi trạng thái hiện tại, không ghi thay đổi - không giữ backward:** khi tạo
+   mới hoặc cập nhật block/tài liệu (dù tạo mới hay điều chỉnh), luôn coi như
+   **phiên bản đầu tiên**. Viết nội dung cuối cùng như thể viết lại từ đầu hôm nay.
    Tài liệu mô tả sự vật ĐANG NHƯ THẾ NÀO, không mô tả CHÚNG ĐÃ THAY ĐỔI RA SAO.
-   Cấm trong thân tài liệu các câu kiểu "đã cập nhật...", "đã bổ sung...",
-   "đã loại bỏ...", "không còn áp dụng...", "trước đây...". Không nhúng lịch sử
+   TUYỆT ĐỐI không giữ backward: không đề cập backward, previous version, migration
+   từ bản cũ, hay lịch sử phiên bản. Cấm trong thân tài liệu các câu kiểu "đã cập
+   nhật...", "đã bổ sung...", "đã loại bỏ...", "không còn áp dụng...", "trước đây...",
+   "backward compatible", "previous version", "migration". Không nhúng lịch sử
    phiên bản, ghi chú sửa đổi hay mục "có gì mới" vào bất kỳ đâu — việc kiểm soát
    phiên bản do **git đảm nhiệm**.
 
