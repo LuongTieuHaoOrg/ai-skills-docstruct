@@ -259,7 +259,10 @@ Không giữ backward: mọi tạo mới/điều chỉnh đều coi như version
    - Quét thực trạng: file nào thiếu/trống (`DRAFT`), `UPDATING`, `RELEASED`,
      `change-requests/CR-*.md` mới. Dùng order chuẩn làm tham chiếu để hiểu tiền đề
      (vd `01-overview` và `02-business` là tiền đề cho `04-architecture`), nhưng
-     **không cứng nhắc** — hiểu linh hoạt cái gì thực sự cần.
+     **không cứng nhắc** — hiểu linh hoạt cái gì thực sự cần. Bỏ qua file auto
+     `00-common/02-references, 03-abbreviations, 04-glossary, 05-traceability`
+     (chỉ `01-conventions.md` là manual và có thể đề xuất sớm); điểm bắt đầu viết
+     là `01-overview`, không phải `00-common`.
    - Nếu có `<file>`: coi như bạn muốn file đó, nhưng nếu nó phụ thuộc tiền đề chưa
      xong (vd nhắm `04-architecture` trong khi `01-overview/03-goals.md` còn trống),
      giải thích vì sao tiền đề quan trọng và hỏi `Bạn muốn tiếp tục file này hay
@@ -283,8 +286,18 @@ Không giữ backward: mọi tạo mới/điều chỉnh đều coi như version
 5. **Viết** — tạo/cập nhật file đích trong folder chuẩn (kebab-case + prefix số,
    Mục 9) bằng văn current-state (Mục 9, không backward). Cập nhật `status:`
    thành `DRAFT` hoặc `UPDATING`. Nếu có fact mới, cập nhật `knowledge/` nếu cần.
-6. **Dọn elicitation** — hỏi `Giữ file elicitation để tra cứu hay xóa? (keep / delete)`.
-7. **Confirm & đánh trạng thái** — hỏi `Đánh trạng thái file là? (DRAFT / UPDATING / RELEASED)`.
+6. **Tự động cập nhật 00-common** — ngay sau khi viết, quét nội dung mới để tìm
+   thuật ngữ, viết tắt, reference chưa có trong `00-common/`. Tự động append vào
+   file tương ứng mà không cần lệnh khác:
+   - Thuật ngữ mới → append vào `00-common/04-glossary.md` với định nghĩa 1 dòng
+     suy từ context; nếu `vi-en` thì thêm gloss tiếng Anh.
+   - Viết tắt mới → append vào `00-common/03-abbreviations.md`.
+   - Reference ngoài mới → append vào `00-common/02-references.md`.
+   Không cần confirm; chỉ ghi chú `Auto-updated 00-common: +2 terms, +1 abbreviation.`
+   trong reply. Deduplicate trước khi append và vẫn auto-append ngay cả khi file
+   `00-common` đã `RELEASED` (vì đây là tham chiếu sống).
+7. **Dọn elicitation** — hỏi `Giữ file elicitation để tra cứu hay xóa? (keep / delete)`.
+8. **Confirm & đánh trạng thái** — hỏi `Đánh trạng thái file là? (DRAFT / UPDATING / RELEASED)`.
    Mặc định `RELEASED` nếu user nói đã xong. Cập nhật frontmatter và
    `.docstruct/status/<path>`. `RELEASED` mới được tham chiếu bởi `generate` sau.
 
@@ -316,7 +329,7 @@ VÍ DỤ:
 Cấu trúc duy nhất cho mọi dự án:
 
 docs/                        # hoặc .docstruct/docs/ tùy doc-root user chọn
-├── 00-common/               # 01-glossary.md, 02-abbreviations.md, 03-references.md, 04-conventions.md, 05-traceability.md (auto)
+├── 00-common/               # 01-conventions.md, 02-references.md, 03-abbreviations.md, 04-glossary.md, 05-traceability.md (01 manual, 02-05 auto)
 ├── 01-overview/             # 01-problem-statement.md, 02-vision.md, 03-goals.md, 04-scope.md, 05-stakeholders.md, 06-constraints.md, 07-roadmap.md (Version|Goal|Target|Status)
 ├── 02-business/             # 01-value-proposition.md, 02-market-analysis.md, 03-business-model.md, 04-pricing.md, 05-sla.md, 06-risk-legal.md, use-cases/, change-requests/CR-*.md
 ├── 03-features/             # 01-feature-catalog.md, 04-dependencies.md, features/<feature>/ 01-overview.md, 02-user-stories.md, 03-acceptance-criteria.md
@@ -329,7 +342,7 @@ docs/                        # hoặc .docstruct/docs/ tùy doc-root user chọn
 ├── 10-deliverables/         # 01-BRD.md, 02-PRD.md, 03-SAD.md, 04-FSD.md, 05-SRD.md, 06-Proposal.md, 07-TestPlan.md, 08-Runbook.md, 09-UserAdminGuide.md (placeholder với headings riêng + Ref link, không giống nhau)
 └── 99-assets/               # Hình ảnh, sơ đồ, templates
 
-`init` tạo đủ folder/file trên; mỗi `10-deliverables/*.md` là placeholder với headings riêng (vd BRD: Business Goals/Stakeholders/Requirements; SAD: Components/Data Flow/Security/Deployment) kèm mô tả 1 dòng và `Ref: ../01-overview/...` tới block nguồn — không phải template y nhau. `00-common/05-traceability.md` tự sinh bởi `generate` từ `status: RELEASED` + `knowledge/_index.md`; `07-roadmap.md` đơn giản Version|Goal|Target|Status (bugfix không lên roadmap, lưu tại `change-requests/` + `07-quality/05-quality-metrics.md`); `change-requests/CR-*.md` lưu mỗi yêu cầu khách theo timestamp.
+`init` tạo đủ folder/file trên; mỗi `10-deliverables/*.md` là placeholder với headings riêng kèm `Ref: ../01-overview/...` — không y nhau. `00-common` auto (`02-references, 03-abbreviations, 04-glossary, 05-traceability`) tự sinh bởi `generate`; chỉ `01-conventions.md` là file manual trong `00-common` và nên viết sớm. Điểm bắt đầu viết là `01-overview` (không phải `00-common`).
 
 --- PHÂN ĐỊNH `03-features` VÀ `02-business/use-cases/` ---
 

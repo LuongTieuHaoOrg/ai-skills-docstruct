@@ -158,7 +158,7 @@ With no description: still scan the current project first, then start asking fro
 
 Build documentation flexibly based on current state + your role. Two modes:
 
-- `/docstruct generate` — propose 2–3 next files to build, based on reality, not rigid order.
+- `/docstruct generate` — propose 2–3 next files to build, based on reality, not rigid order. Skips auto `00-common` files (02-references, 03-abbreviations, 04-glossary, 05-traceability) — they are auto-populated; only `00-common/01-conventions.md` is proposed manually and early.
 - `/docstruct generate <file>` — focus on a specific file (e.g. `02-business/01-value-prop.md` or `10-deliverables/01-BRD.md`) to create or adjust it. If the file is `RELEASED`, warn and ask to update.
 
 ### Ordered index
@@ -184,7 +184,7 @@ No backward compatibility: every creation or adjustment is treated as the **firs
 1. **Selective RAG** — read `knowledge/_index.md` (if exists), pick rows whose domain/tags match the target file (`business` for BRD/Proposal, `technical`+`architecture` for SAD/FSD, `team` for people), load only those knowledge files.
 2. **Ask who you are & propose next file based on reality:**
    - Ask first: `Who are you in this project? What is your role? (customer / sales / BA / dev / PM) — what do you know best about?` Save answer to `knowledge/team-role.md` if not yet stored (or confirm `Still <role>?`), and also to `elicitation/<target>.md`.
-   - Scan the current docs reality: which files are missing/empty (`DRAFT`), which are `UPDATING`, which are `RELEASED`, which `change-requests/CR-*.md` are new. Use the canonical order as reference to understand prerequisites (e.g. `01-overview` and `02-business` are prerequisites for `04-architecture`), but **do not enforce rigidly** — understand flexibly what is actually needed.
+   - Scan the current docs reality: which files are missing/empty (`DRAFT`), which are `UPDATING`, which are `RELEASED`, which `change-requests/CR-*.md` are new. Use the canonical order as reference to understand prerequisites (e.g. `01-overview` and `02-business` are prerequisites for `04-architecture`), but **do not enforce rigidly** — understand flexibly what is actually needed. Skip auto files `00-common/02-references, 03-abbreviations, 04-glossary, 05-traceability` (only `01-conventions.md` is manual and may be proposed early); start writing at `01-overview`, not `00-common`.
    - If `<file>` was given: treat it as the user's preference, but if it depends on an unfinished prerequisite (e.g. targeting `04-architecture` while `01-overview/03-goals.md` is still empty), explain why the prerequisite matters and ask `Do you want to continue with this file or switch to the prerequisite?`.
    - If no `<file>`: propose **2–3 candidates** for the next file, each with a one-line reason (e.g. `1. 01-overview/01-problem-statement.md — foundational purpose is still empty; 2. 02-business/01-value-prop.md — business value needed before architecture`). Let the user pick. If the user picks none, they can specify another file.
    - Once a target is chosen/confirmed, read its existing content if any (`UPDATING` case) and nearby files in the same folder + glossary for context. Note current status (`DRAFT` if new, `UPDATING` if exists).
@@ -194,8 +194,13 @@ No backward compatibility: every creation or adjustment is treated as the **firs
    - Analyze: check which required sections of the target file (per schema) are still missing. If incomplete, ask another 3–5 follow-up questions, append to elicitation file, repeat until sufficient.
 4. **Propose outline** — list sections for the target file, annotating source (which block/folder and which knowledge files). Wait for outline approval.
 5. **Write** — create/update the target file in its canonical folder (kebab-case + numeric prefix, Section 9) using current-state style (Section 9, no backward). Update `status:` frontmatter to `DRAFT` or `UPDATING` as appropriate. If knowledge facts were introduced, also update `knowledge/` if needed. Record `related_paths` if any.
-6. **Elicitation cleanup** — ask `Keep elicitation file for reference or delete? (keep / delete)`. Act accordingly.
-7. **Confirm & mark status** — ask `Mark this file as? (DRAFT / UPDATING / RELEASED)`. Default is `RELEASED` if the user says the file is done. Update frontmatter and `.docstruct/status/<path>` accordingly. `RELEASED` files become referenceable by later `generate` runs.
+6. **Auto-update 00-common** — immediately after writing, scan the new content for glossary terms, abbreviations, and references not yet in `00-common/`. Auto-append them to the corresponding file without requiring another command:
+   - New term → append to `00-common/04-glossary.md` with one-line definition inferred from context; if `vi-en` mode, add English gloss.
+   - New abbreviation → append to `00-common/03-abbreviations.md`.
+   - New external reference (link, doc, standard) → append to `00-common/02-references.md`.
+   No confirmation needed; just note `Auto-updated 00-common: +2 terms, +1 abbreviation.` in the reply. Deduplicate before appending and respect `status: RELEASED` — still auto-append even to RELEASED `00-common` files (they are living references).
+7. **Elicitation cleanup** — ask `Keep elicitation file for reference or delete? (keep / delete)`. Act accordingly.
+8. **Confirm & mark status** — ask `Mark this file as? (DRAFT / UPDATING / RELEASED)`. Default is `RELEASED` if the user says the file is done. Update frontmatter and `.docstruct/status/<path>` accordingly. `RELEASED` files become referenceable by later `generate` runs.
 
 ### Examples
 
@@ -225,7 +230,7 @@ Single structure for all projects:
 
 ```
 docs/                        # or .docstruct/docs/ depending on user-chosen doc-root
-├── 00-common/               # 01-glossary.md, 02-abbreviations.md, 03-references.md, 04-conventions.md, 05-traceability.md (auto)
+├── 00-common/               # 01-conventions.md, 02-references.md, 03-abbreviations.md, 04-glossary.md, 05-traceability.md (01 manual, 02-05 auto)
 ├── 01-overview/             # 01-problem-statement.md, 02-vision.md, 03-goals.md, 04-scope.md, 05-stakeholders.md, 06-constraints.md, 07-roadmap.md (Version|Goal|Target|Status)
 ├── 02-business/             # 01-value-proposition.md, 02-market-analysis.md, 03-business-model.md, 04-pricing.md, 05-sla.md, 06-risk-legal.md, use-cases/, change-requests/CR-*.md
 ├── 03-features/             # 01-feature-catalog.md, 04-dependencies.md, features/<feature>/ 01-overview.md, 02-user-stories.md, 03-acceptance-criteria.md
@@ -239,7 +244,7 @@ docs/                        # or .docstruct/docs/ depending on user-chosen doc-
 └── 99-assets/               # Images, diagrams, templates
 ```
 
-`init` creates all folders/files above; each `10-deliverables/*.md` is a placeholder with its own headings (e.g. BRD: Business Goals/Stakeholders/Requirements; SAD: Components/Data Flow/Security/Deployment) plus one-line descriptions and `Ref: ../01-overview/...` links to source blocks — not identical templates. `00-common/05-traceability.md` is auto-generated by `generate` from `status: RELEASED` + `knowledge/_index.md`; `07-roadmap.md` is simple Version|Goal|Target|Status (bugfix not on roadmap, tracked in `change-requests/` + `07-quality/05-quality-metrics.md`); `change-requests/CR-*.md` holds each customer request by timestamp.
+`init` creates all folders/files above; each `10-deliverables/*.md` is a placeholder with its own headings plus `Ref: ../01-overview/...` links — not identical templates. `00-common` auto files (`02-references, 03-abbreviations, 04-glossary, 05-traceability`) are living references auto-populated by `generate`; `00-common/01-conventions.md` is the only manual file in `00-common` and should be written early. `01-overview` is the starting point for writing (not `00-common`).
 
 ### Distinguishing `03-features` from `02-business/use-cases/`
 
