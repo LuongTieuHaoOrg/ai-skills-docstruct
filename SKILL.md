@@ -156,14 +156,14 @@ With no description: still scan the current project first, then start asking fro
 
 ## 6. Command `/docstruct generate` / `generate <file>` — Build Docs in Order (Role-Adaptive)
 
-Build documentation sequentially from overview → business → technical. Two modes:
+Build documentation flexibly based on current state + your role. Two modes:
 
-- `/docstruct generate` — find the next missing/empty file in canonical order and build it.
+- `/docstruct generate` — propose 2–3 next files to build, based on reality, not rigid order.
 - `/docstruct generate <file>` — focus on a specific file (e.g. `02-business/01-value-prop.md` or `10-deliverables/01-BRD.md`) to create or adjust it. If the file is `RELEASED`, warn and ask to update.
 
 ### Ordered index
 
-Canonical order is `00-common → 01-overview → 02-business → 03-features → 04-architecture → 05-security → 06-implementation → 07-quality → 08-operations → 09-guides → 10-deliverables → 99-assets` as defined in `schema.yaml` and Section 8. Within each folder, files are ordered by their numeric prefix. `generate` (no file) scans this order and picks the first file that is missing or empty (size 0 or only placeholder). If all files are `RELEASED`, reply `All done — every file is RELEASED.`.
+Canonical order is `00-common → 01-overview → 02-business → 03-features → 04-architecture → 05-security → 06-implementation → 07-quality → 08-operations → 09-guides → 10-deliverables → 99-assets` as defined in `schema.yaml` and Section 8. Within each folder, files are ordered by numeric prefix. This order is the **reference**, not a rigid gate: use it to understand what is prerequisite for what, but do not block flexibly. If all files are `RELEASED`, reply `All done — every file is RELEASED.`.
 
 ### Elicitation storage
 
@@ -182,13 +182,15 @@ No backward compatibility: every creation or adjustment is treated as the **firs
 ### Workflow
 
 1. **Selective RAG** — read `knowledge/_index.md` (if exists), pick rows whose domain/tags match the target file (`business` for BRD/Proposal, `technical`+`architecture` for SAD/FSD, `team` for people), load only those knowledge files.
-2. **Resolve target:**
-   - If `<file>` given: normalize (add `.md` if missing, resolve relative to doc-root), verify it is within the standard tree. If `RELEASED`, warn and ask to update as above.
-   - If no `<file>`: scan canonical order for the first missing/empty file. If none, reply `All done.`.
-   - Read existing content if any (`UPDATING` case) and nearby files in the same folder + glossary for context. Note current status (`DRAFT` if new, `UPDATING` if exists).
-3. **Role-adaptive elicitation:**
-   - Ask role first: `What is your role for this file? (customer / sales / BA / dev / PM) — what do you know best?` Save answer to `elicitation/<target>.md`.
-   - Generate **~5 tailored questions** based on `role + file domain` (e.g. for `02-business/*` with customer → market/pain/SLA/metrics; for `04-architecture/*` with customer → flows/business rules, with dev → endpoints/schemas/NFR/diagrams). **Never ask a customer about code.** Append Q&A to the elicitation file.
+2. **Ask who you are & propose next file based on reality:**
+   - Ask first: `Who are you in this project? What is your role? (customer / sales / BA / dev / PM) — what do you know best about?` Save answer to `knowledge/team-role.md` if not yet stored (or confirm `Still <role>?`), and also to `elicitation/<target>.md`.
+   - Scan the current docs reality: which files are missing/empty (`DRAFT`), which are `UPDATING`, which are `RELEASED`, which `change-requests/CR-*.md` are new. Use the canonical order as reference to understand prerequisites (e.g. `01-overview` and `02-business` are prerequisites for `04-architecture`), but **do not enforce rigidly** — understand flexibly what is actually needed.
+   - If `<file>` was given: treat it as the user's preference, but if it depends on an unfinished prerequisite (e.g. targeting `04-architecture` while `01-overview/03-goals.md` is still empty), explain why the prerequisite matters and ask `Do you want to continue with this file or switch to the prerequisite?`.
+   - If no `<file>`: propose **2–3 candidates** for the next file, each with a one-line reason (e.g. `1. 01-overview/01-problem-statement.md — foundational purpose is still empty; 2. 02-business/01-value-prop.md — business value needed before architecture`). Let the user pick. If the user picks none, they can specify another file.
+   - Once a target is chosen/confirmed, read its existing content if any (`UPDATING` case) and nearby files in the same folder + glossary for context. Note current status (`DRAFT` if new, `UPDATING` if exists).
+3. **Role-adaptive elicitation (flexible, not rigid):**
+   - Generate **~5 tailored questions** based on `role + file domain + current reality` (e.g. for `02-business/*` with customer → market/pain/SLA/metrics; for `04-architecture/*` with customer → flows/business rules only, with dev → endpoints/schemas/NFR/diagrams). **Never ask a customer about code**, but otherwise adapt to what is actually missing — do not apply a hard rule like "purpose before technical" to every case.
+   - Append Q&A to the elicitation file.
    - Analyze: check which required sections of the target file (per schema) are still missing. If incomplete, ask another 3–5 follow-up questions, append to elicitation file, repeat until sufficient.
 4. **Propose outline** — list sections for the target file, annotating source (which block/folder and which knowledge files). Wait for outline approval.
 5. **Write** — create/update the target file in its canonical folder (kebab-case + numeric prefix, Section 9) using current-state style (Section 9, no backward). Update `status:` frontmatter to `DRAFT` or `UPDATING` as appropriate. If knowledge facts were introduced, also update `knowledge/` if needed. Record `related_paths` if any.

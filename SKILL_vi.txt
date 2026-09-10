@@ -213,9 +213,9 @@ Không có mô tả: vẫn quét dự án hiện tại trước, rồi hỏi t�
 6. LỆNH `/docstruct generate` / `generate <file>` - XÂY DOCS THEO THỨ TỰ (HỎI THEO ROLE)
 ================================================================================
 
-Xây tài liệu tuần tự từ tổng quan -> business -> kỹ thuật. Hai chế độ:
+Xây tài liệu linh hoạt dựa trên thực trạng + vai trò bạn. Hai chế độ:
 
-- `/docstruct generate` — tìm file thiếu/trống tiếp theo theo thứ tự chuẩn và xây nó.
+- `/docstruct generate` — đề xuất 2-3 file tiếp theo để xây, dựa trên thực trạng, không cứng nhắc.
 - `/docstruct generate <file>` — tập trung vào file chỉ định (vd `02-business/01-value-prop.md`
   hoặc `10-deliverables/01-BRD.md`) để tạo hoặc điều chỉnh. Nếu file đã `RELEASED`,
   cảnh báo và hỏi có update không.
@@ -225,9 +225,9 @@ Xây tài liệu tuần tự từ tổng quan -> business -> kỹ thuật. Hai c
 Thứ tự là `00-common -> 01-overview -> 02-business -> 03-features -> 04-architecture
 -> 05-security -> 06-implementation -> 07-quality -> 08-operations -> 09-guides
 -> 10-deliverables -> 99-assets` như trong `schema.yaml` và Mục 8. Trong mỗi folder,
-file xếp theo prefix số. `generate` không tham số quét thứ tự này và chọn file đầu
-tiên thiếu/trống (size 0 hoặc chỉ placeholder). Nếu tất cả đã `RELEASED`, trả
-`Tất cả đã hoàn thiện.`.
+file xếp theo prefix số. Thứ tự này là tham chiếu, không phải gate cứng: dùng để hiểu
+tiền đề (vd `01-overview` và `02-business` là tiền đề cho `04-architecture`), nhưng
+không chặn linh hoạt. Nếu tất cả đã `RELEASED`, trả `Tất cả đã hoàn thiện.`.
 
 ### Lưu elicitation
 
@@ -252,21 +252,32 @@ Không giữ backward: mọi tạo mới/điều chỉnh đều coi như version
 1. **RAG chọn lọc** — đọc `knowledge/_index.md` (nếu có), chọn dòng có
    domain/tags khớp file đích (`business` cho BRD, `technical`+`architecture` cho
    SAD, `team` cho người), chỉ load file khớp.
-2. **Xác định đích:**
-   - Nếu có `<file>`: chuẩn hóa (thêm `.md` nếu thiếu, resolve theo doc-root),
-     kiểm tra trong cây chuẩn. Nếu `RELEASED`, cảnh báo và hỏi update như trên.
-   - Nếu không có `<file>`: quét thứ tự chuẩn, chọn file thiếu/trống đầu tiên.
-     Nếu không còn, trả `Tất cả đã hoàn thiện.`
-   - Đọc nội dung hiện có (nếu `UPDATING`) và file lân cận cùng folder + glossary.
-3. **Hỏi theo role (linh hoạt):**
-   - Hỏi role trước: `Bạn ở vai trò nào với file này? (customer / sales / BA / dev / PM)
-     — bạn nắm gì nhất?` Lưu vào `elicitation/<target>.md`.
-   - Sinh **~5 câu hỏi** dựa trên `role + domain file` (vd `02-business/*` với
-     customer -> market/pain/SLA/metrics; `04-architecture/*` với customer -> chỉ
-     hỏi flow/business rule, với dev mới hỏi endpoint/schema/NFR/diagram). **Không
-     hỏi khách hàng về code.** Append Q&A vào elicitation file.
-   - Phân tích: kiểm tra field bắt buộc của file đích (theo schema) còn thiếu gì.
-     Nếu thiếu, hỏi tiếp 3-5 câu bổ sung, append, lặp đến khi đủ.
+2. **Hỏi bạn là ai & đề xuất file theo thực trạng:**
+   - Hỏi trước: `Bạn là ai trong dự án này? Vai trò gì? (customer / sales / BA / dev / PM)
+     — bạn nắm gì nhất?` Lưu vào `knowledge/team-role.md` nếu chưa có (lần sau chỉ
+     xác nhận `Vẫn là <role>?`), và vào `elicitation/<target>.md`.
+   - Quét thực trạng: file nào thiếu/trống (`DRAFT`), `UPDATING`, `RELEASED`,
+     `change-requests/CR-*.md` mới. Dùng order chuẩn làm tham chiếu để hiểu tiền đề
+     (vd `01-overview` và `02-business` là tiền đề cho `04-architecture`), nhưng
+     **không cứng nhắc** — hiểu linh hoạt cái gì thực sự cần.
+   - Nếu có `<file>`: coi như bạn muốn file đó, nhưng nếu nó phụ thuộc tiền đề chưa
+     xong (vd nhắm `04-architecture` trong khi `01-overview/03-goals.md` còn trống),
+     giải thích vì sao tiền đề quan trọng và hỏi `Bạn muốn tiếp tục file này hay
+     chuyển sang tiền đề?`.
+   - Nếu không có `<file>`: đề xuất **2-3 ứng viên** cho file tiếp theo, mỗi cái
+     kèm lý do 1 dòng (vd `1. 01-overview/01-problem-statement.md — mục đích nền tảng
+     còn trống; 2. 02-business/01-value-prop.md — business cần trước architecture`).
+     Để bạn chọn. Bạn cũng có thể chỉ định file khác.
+   - Khi đã chọn/chốt đích, đọc nội dung hiện có (nếu `UPDATING`) và file lân cận
+     cùng folder + glossary.
+3. **Hỏi chi tiết linh hoạt theo role+thực trạng:**
+   - Sinh **~5 câu hỏi** dựa trên `role + domain file + thực trạng` (vd
+     `02-business/*` với customer -> market/pain/SLA/metrics; `04-architecture/*`
+     với customer -> chỉ hỏi flow/business rule, với dev mới hỏi endpoint/schema/
+     NFR/diagram). **Không hỏi khách hàng về code**, nhưng không áp rule cứng
+     "mục đích trước technical" cho mọi case.
+   - Append Q&A vào elicitation file. Phân tích thiếu field nào của file đích
+     (theo schema) còn thiếu gì → hỏi tiếp 3-5 câu bổ sung, append, lặp đến khi đủ.
 4. **Đề xuất outline** — liệt kê section cho file đích, ghi chú nguồn
    (block/folder và file knowledge nào). Chờ duyệt.
 5. **Viết** — tạo/cập nhật file đích trong folder chuẩn (kebab-case + prefix số,
