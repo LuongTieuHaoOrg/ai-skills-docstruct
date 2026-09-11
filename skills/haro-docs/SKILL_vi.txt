@@ -2,6 +2,9 @@
 SKILL: HARO-DOCS — BẢN DỊCH TIẾNG VIỆT (THAM KHẢO CHO NGƯỜI ĐỌC)
 File này CHỈ dành cho con người đọc. Agent KHÔNG load file này —
 bản chính thức để agent thực thi là SKILL.md (tiếng Anh).
+
+NOTE CHO NGƯỜI ĐỌC: từ bản này, SKILL.md (tiếng Anh, để agent thực thi) đã tách thành router mỏng + thư mục skills/haro-docs/references/ (chi tiết từng lệnh). File VI này giữ nguyên 1 file để con người đọc liền mạch.
+
 ================================================================================
 
 --- FRONTMATTER ---
