@@ -9,11 +9,11 @@ Objectively research, analyze and evaluate a problem, idea, or doc file using cr
 
 ### Syntax
 
-``
+```
 /haro-docs review Should we use microservices for this project?
 /haro-docs review 04-architecture/02-components.md
 /haro-docs review --no-agents The current pricing model has a flaw
-``
+```
 
 ### Workflow
 
@@ -42,9 +42,9 @@ Objectively research, analyze and evaluate a problem, idea, or doc file using cr
 
 ### Examples
 
-``
+```
 /haro-docs review Should we use microservices for this project?
 /haro-docs review 05-security/01-threat-model.md
 /haro-docs review --no-agents Is the current SLA realistic?
-``
+```
 

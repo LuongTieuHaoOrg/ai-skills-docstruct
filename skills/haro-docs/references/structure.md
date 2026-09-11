@@ -20,7 +20,7 @@
 
 Single structure for all projects:
 
-``
+```
 docs/                        # or .haro-docs/docs/ depending on user-chosen doc-root
 ├── 00-common/               # 01-conventions.md, 02-references.md, 03-abbreviations.md, 04-glossary.md, 05-traceability.md (01 manual, 02-05 auto)
 ├── 01-overview/             # 01-problem-statement.md, 02-vision.md, 03-goals.md, 04-scope.md, 05-stakeholders.md, 06-constraints.md, 07-roadmap.md (Version|Goal|Target|Status)
@@ -34,7 +34,7 @@ docs/                        # or .haro-docs/docs/ depending on user-chosen doc-
 ├── 09-guides/               # 01-user-guide.md, 02-admin-guide.md, 03-training.md, 04-faq.md, 05-onboarding.md
 ├── 10-deliverables/         # 01-BRD.md, 02-PRD.md, 03-SAD.md, 04-FSD.md, 05-SRD.md, 06-Proposal.md, 07-TestPlan.md, 08-Runbook.md, 09-UserAdminGuide.md (placeholders with distinct headings + Ref links, not identical)
 └── 99-assets/               # Images, diagrams, templates
-``
+```
 
 `init` creates all folders/files above; each `10-deliverables/*.md` is a placeholder with its own headings plus `Ref: ../01-overview/...` links — not identical templates. In `00-common`, `01-conventions.md` is decided during `init` (§5.2 step 3b, 2 layers: fixed Part A + project-specific Part B, MD-only single source) while `02-references, 03-abbreviations, 04-glossary, 05-traceability` are living references auto-populated by `generate` from placeholders marked `auto-populated by generate — do not edit manually`; `05-traceability.md` format is a table `deliverable | source blocks | block status | knowledge refs`. `01-overview` is the starting point for writing (not `00-common`).
 

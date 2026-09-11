@@ -54,9 +54,9 @@ No backward compatibility: every creation or adjustment is treated as the **firs
 
 ### Examples
 
-``
+```
 /haro-docs generate
 /haro-docs generate 02-business/01-value-prop.md
 /haro-docs generate 10-deliverables/01-BRD.md
-``
+```
 

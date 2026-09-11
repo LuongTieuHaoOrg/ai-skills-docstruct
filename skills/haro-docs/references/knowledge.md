@@ -16,7 +16,7 @@ Knowledge files are project facts the agent must remember and follow. They are s
 
 ### Storage
 
-``
+```
 .haro-docs/knowledge/
 ├── _index.md          # file | domain | summary | tags — the only file read by default
 ├── business-*.md
@@ -24,7 +24,7 @@ Knowledge files are project facts the agent must remember and follow. They are s
 ├── team-*.md
 ├── common-*.md
 └── security-*.md
-``
+```
 
 `_index.md` format (one row per knowledge file):
 
@@ -56,8 +56,8 @@ Unknown subcommand for this group → `Unknown command 'X'. Valid: remember <fre
 
 ### Examples
 
-``
+```
 /haro-docs remember STID is my company, I am PM, members are Hao (me), Vu (Backend) and Dai (Frontend)
 /haro-docs knowledge
-``
+```
 

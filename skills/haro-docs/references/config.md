@@ -8,12 +8,12 @@ Central hub for skill configuration. Three branches, no `doc-root` here (changin
 
 ### 11.1 Hub (no args)
 
-``
+```
 /haro-docs config               → hub picker (read-only until a branch is chosen)
 /haro-docs config agents        → straight into §11.2
 /haro-docs config conventions   → straight into §11.3
 /haro-docs config language      → straight into §11.4
-``
+```
 
 Workflow:
 

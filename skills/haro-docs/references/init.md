@@ -76,10 +76,10 @@ Use the agent's question/picker tool when available, otherwise a numbered list. 
 
 ### Examples
 
-``
+```
 /haro-docs init E-commerce project with Next.js + PostgreSQL, team of 3 devs
 /haro-docs init
-``
+```
 
 With no description: still scan the current project first, then start asking from step 2 of §5.2.
 
