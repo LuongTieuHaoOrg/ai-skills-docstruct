@@ -8,6 +8,8 @@ project:
   type: ""                      # software | hardware | service | research
   created: ""                   # YYYY-MM-DD
 
+schema_version: 1               # Docstruct schema version, starts at 1 — bumped on migrate/upgrade
+
 audience:
   primary: []                   # e.g. [engineers, project managers]
   technical_depth: ""           # high-level | balanced | deep-dive

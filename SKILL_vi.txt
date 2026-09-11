@@ -9,8 +9,9 @@ name: docstruct
 description: Quản lý và tạo cấu trúc tài liệu dự án theo mô hình Atomic
 Content Blocks. Kích hoạt khi user muốn khởi tạo cấu trúc tài liệu cho dự án mới,
 tổ chức/refactor tài liệu đang tồn tại, tổng hợp tài liệu hoàn chỉnh (BRD, PRD,
-SAD, FSD...) hoặc quản lý bộ nhớ kiến thức project qua remember/knowledge. Gõ
-/docstruct không tham số để xem cấu trúc hiện tại và hướng dẫn.
+SAD, FSD...), review phản biện một vấn đề/file qua subagent, hoặc quản lý bộ nhớ
+kiến thức project qua remember/knowledge. Gõ /docstruct không tham số để quét
+dự án và chọn thao tác tiếp theo.
 
 ================================================================================
 1. TỔNG QUAN
@@ -54,8 +55,9 @@ Vì không có vector search, knowledge được tổ chức để truy xuất q
 Skill lưu toàn bộ cấu hình và trạng thái vào `.docstruct/` tại gốc dự án:
 
 .docstruct/
-├── project-profile.yaml   # Hồ sơ dự án: loại, audience, doc-root, cấu hình ngôn ngữ
-├── schema.yaml            # Cây thư mục đã duyệt + ma trận tổng hợp
+├── project-profile.yaml   # Hồ sơ dự án: loại, audience, doc-root, cấu hình ngôn ngữ, schema_version
+├── schema.yaml            # Cây thư mục đã duyệt + ma trận tổng hợp (+ schema_version)
+├── agents.yaml            # Cấu hình subagent review ("đệ tử") — xem Mục 10
 ├── status/                # Trạng thái: DRAFT | UPDATING | RELEASED
 ├── knowledge/             # Bộ nhớ kiến thức - RAG chọn lọc (xem Mục 4)
 │   ├── _index.md          # Tra cứu: file | domain | summary | tags
@@ -63,8 +65,9 @@ Skill lưu toàn bộ cấu hình và trạng thái vào `.docstruct/` tại g�
 │   ├── technical-*.md
 │   ├── team-*.md
 │   └── common-*.md
-└── elicitation/           # Q&A tạm cho generate (xem Mục 6)
-    └── <sanitized-path>.md
+├── elicitation/           # Q&A tạm cho generate (xem Mục 6)
+│   └── <sanitized-path>.md
+└── reviews/               # Báo cáo review đã lưu: RR-YYYYMMDD-HHmmss-<slug>.md (xem Mục 10)
 
 > QUAN TRỌNG: `project-profile.yaml` ghi rõ **doc-root** — vị trí lưu tài liệu do
 > user chọn khi chạy `init`. Mọi lệnh (generate, remember, knowledge) phải
@@ -84,32 +87,52 @@ Skill lưu toàn bộ cấu hình và trạng thái vào `.docstruct/` tại g�
 > `.docstruct/status/`). Xem Mục 6.
 
 ================================================================================
-3. LỆNH `/docstruct` (không tham số) - HELP & STATUS DASHBOARD
+3. LỆNH `/docstruct` (không tham số) - QUÉT DỰ ÁN + DASHBOARD + CHỌN THAO TÁC
 ================================================================================
 
 Khi user chạy `/docstruct` không tham số, hoặc tham số không khớp lệnh nào, KHÔNG
-thực thi workflow. Thay vào đó hiển thị dashboard help:
+thực thi workflow. Thay vào đó chạy **quét sâu chỉ-đọc** rồi hiện dashboard + popup
+chọn thao tác:
 
-1. **Đọc trạng thái** - nếu `.docstruct/project-profile.yaml` và `schema.yaml` tồn
-   tại, đọc `docroot` và liệt kê cây thư mục thực tế dưới doc-root (mỗi folder
-   00-common -> 99-assets: tồn tại/thiếu, số file). Nếu chưa init, hiện
-   `Not initialized` và preview cây chuẩn từ Mục 9.
-2. **Kiểm tra knowledge** - nếu `.docstruct/knowledge/_index.md` tồn tại, hiện
-   `Knowledge: N files` và 5 dòng đầu của index; nếu không, hiện `Knowledge: (empty)`.
-3. **Tóm tắt lệnh:**
+1. **Quét sâu (read-only)** -
+   - Nếu `.docstruct/project-profile.yaml` và `schema.yaml` tồn tại: đọc `docroot`,
+     `language.*`, `schema_version`; liệt kê cây thực tế dưới doc-root (mỗi folder
+     00-common -> 99-assets: tồn tại/thiếu, số file, breakdown DRAFT/UPDATING/RELEASED
+     từ frontmatter `status:` + `.docstruct/status/`).
+   - Nếu chưa init: hiện `Not initialized` và preview cây chuẩn từ Mục 8.
+   - Kiểm tra knowledge: nếu `.docstruct/knowledge/_index.md` tồn tại, hiện
+     `Knowledge: N files` và 5 dòng đầu; nếu không, hiện `Knowledge: (empty)`.
+   - Kiểm tra agents: nếu `.docstruct/agents.yaml` tồn tại, hiện
+     `Agents: <ids> (default: <id>)`; nếu không, hiện `Agents: (default inline critic)`.
+   - Quét nhẹ repo: README (domain, tính năng chính), cây source top-level + tín hiệu
+     tech stack (package.json / requirements / go.mod / pom.xml / Cargo.toml...),
+     ước lượng quy mô code, file docs nằm ngoài doc-root (nếu có).
+   - Tổng hợp **Project Note**: 5-8 dòng hiện trạng — đã init?, doc-root, coverage
+     docs (% RELEASED), gap lớn nhất (top-3 folder/file trống), tech stack, độ sâu knowledge.
+2. **Tóm tắt lệnh:**
 
-   | Lệnh | Khi nào dùng | Ví dụ |
-   |------|-------------|-------|
-   | `/docstruct init <mô tả>` | Khởi tạo cấu trúc 12 folder | `/docstruct init E-commerce Next.js + PostgreSQL` |
-   | `/docstruct generate` | Xây file tiếp theo theo thứ tự (hỏi theo role) | `/docstruct generate` |
-   | `/docstruct generate <file>` | Tập trung vào file chỉ định | `/docstruct generate 02-business/01-value-prop.md` |
-   | `/docstruct remember <text tự do>` | Ghi kiến thức (phân tích -> confirm -> lưu) | `/docstruct remember STID là công ty` |
-   | `/docstruct knowledge` | Liệt kê knowledge | `/docstruct knowledge` |
+    | Lệnh | Khi nào dùng | Ví dụ |
+    |------|-------------|-------|
+    | `/docstruct init <mô tả>` | Khởi tạo cấu trúc 12 folder, hoặc re-init / migrate nếu đã init | `/docstruct init E-commerce Next.js + PostgreSQL` |
+    | `/docstruct generate` | Xây file tiếp theo theo thứ tự (hỏi theo role) | `/docstruct generate` |
+    | `/docstruct generate <file>` | Tập trung vào file chỉ định | `/docstruct generate 02-business/01-value-prop.md` |
+    | `/docstruct review <chủ đề\|file>` | Review phản biện vấn đề/file qua subagent | `/docstruct review Có nên dùng microservices?` |
+    | `/docstruct remember <text tự do>` | Ghi kiến thức (phân tích -> confirm -> lưu) | `/docstruct remember STID là công ty` |
+    | `/docstruct knowledge` | Liệt kê knowledge | `/docstruct knowledge` |
+    | `/docstruct config [agents\|conventions\|language]` | Hub cấu hình: subagent review, quy ước, ngôn ngữ | `/docstruct config` |
 
-4. **Hiện Aggregation Matrix rút gọn** - BRD/PRD/SAD/FSD từ Mục 7.
+3. **Hiện Aggregation Matrix rút gọn** - BRD/PRD/SAD/FSD từ Mục 7.
+4. **Popup chọn thao tác** — sau dashboard luôn hỏi user làm gì tiếp (dùng question/picker
+   nếu có, không thì list đánh số). Đề xuất sẵn **2-3 gợi ý thông minh** theo hiện trạng, vd:
+   - Chưa init → gợi ý `init`.
+   - `01-overview` / `02-business` trống → gợi ý `generate <file đó>`.
+   - Nhiều file `RELEASED` nhưng chưa review → gợi ý `review <chủ đề>`.
+   - Knowledge trống → gợi ý `remember <facts>`.
+   User được chọn gợi ý hoặc gọi lệnh khác. KHÔNG tự chạy side-effect khi chưa qua
+   confirm của lệnh đó.
 5. **Không tạo/sửa file.** Nếu token đầu không khớp (vd `/docstruct foo`), prefix
-   `Unknown command 'foo'. Valid: init, generate, remember, knowledge.` và gợi
-   ý gần đúng. Alias `help`, `--help`, `-h` cũng hiện dashboard. So khớp
+   `Unknown command 'foo'. Valid: init, generate, review, remember, knowledge, config.`
+   và gợi ý gần đúng. Alias `help`, `--help`, `-h` cũng hiện dashboard. So khớp
    case-insensitive.
 
 ================================================================================
@@ -174,9 +197,23 @@ Unknown subcommand cho nhóm này -> `Unknown command 'X'. Valid: remember <text
 5. LỆNH `/docstruct init <mô tả dự án>`
 ================================================================================
 
-Khởi tạo cấu trúc tài liệu cho một dự án.
+Khởi tạo cấu trúc tài liệu cho một dự án. Xử lý cả init mới và re-init khi đã init rồi.
 
-QUY TRÌNH BẮT BUỘC:
+### 5.1 PHÁT HIỆN TRẠNG THÁI HIỆN TẠI
+
+1. **Quét trước** — quét sâu như Mục 3: README, cây source + tech stack, docs hiện có
+   (trong và ngoài doc-root), trạng thái `.docstruct/` (project-profile.yaml,
+   schema.yaml, `schema_version`, số file knowledge, config agents).
+2. **Nếu `.docstruct/` đã tồn tại** (re-init) — hiện cái đang có (profile,
+   schema_version, doc-root, số file docs, knowledge N files) và hỏi:
+   - `[1] Override — xây lại từ đầu` (`.docstruct` + cây docs mới từ templates)
+   - `[2] Migrate / Upgrade — cập nhật tại chỗ, giữ nội dung` (khuyên dùng khi
+     docs/knowledge đã có giá trị)
+   - `[3] Hủy`
+   KHÔNG làm tiếp khi chưa có lựa chọn rõ ràng.
+3. **Nếu chưa init** — đi tiếp quy trình chuẩn §5.2.
+
+### 5.2 QUY TRÌNH CHUẨN (init mới)
 
 1. **Quét dự án** — đọc README, mã nguồn (cấu trúc cây, công nghệ chính), tài
    liệu hiện có (nếu có) để tổng hợp bối cảnh: domain nghiệp vụ, tính năng chính,
@@ -193,15 +230,64 @@ QUY TRÌNH BẮT BUỘC:
 3. **Hỏi vị trí lưu tài liệu (doc-root)** — user chọn:
    - `docs/` (thư mục tài liệu truyền thống), hoặc
    - `.docstruct/docs/` (gói gọn trong workspace của skill)
-4. **Xác nhận dàn ý** — trình bày cây thư mục + danh sách file cụ thể, chờ user
-   duyệt. Nếu dự án đã có tài liệu không theo schema, đề xuất luôn phương án sắp
-   xếp lại (bảng mapping di chuyển) trong bước này.
+3b. **Chốt quy ước (gọn 4-6 câu)** — Phần A (cố định do skill áp: naming file, SSOT,
+   vòng đời status, ngôn ngữ, images, quy tắc file auto) được seed từ
+   `templates/conventions.md`, không hỏi; chỉ hiện preview read-only. Chỉ hỏi Phần B
+   (đặc thù dự án) kèm default suy từ scan:
+   - Diagram tool: `mermaid | plantuml | drawio` (+ fallback image)
+   - API spec format: `openapi-yaml | md-table | both`
+   - Tone & độ sâu: `high-level | balanced | deep-dive` (sync `audience.technical_depth`)
+   - Người duyệt RELEASED: một tên/role, hoặc duyệt theo domain
+   - Thuật ngữ khóa: tên sản phẩm/thương hiệu giữ nguyên cách viết, hoặc `(none)`
+   - Deliverable ưu tiên: BRD/PRD/SAD/... nào trước, hoặc `(all)`
+
+   Mục nào bỏ trống thì dùng default đã ghi rõ. Ghi `00-common/01-conventions.md` ngay
+   (status RELEASED, nguồn duy nhất dạng MD — không mirror sang YAML).
+4. **Xác nhận dàn ý** — trình bày cây thư mục + danh sách file cụ thể (đã gồm quy ước
+   vừa chốt), chờ user duyệt. Nếu dự án đã có tài liệu không theo schema, đề xuất luôn
+   phương án sắp xếp lại (bảng mapping `old path → new path | giữ / di chuyển / archive
+   vào 99-assets/_legacy/`) trong bước này.
 5. **Khởi tạo** — sau khi duyệt:
    - Tạo `.docstruct/project-profile.yaml` và `.docstruct/schema.yaml`
-     (từ template trong thư mục `templates/` của skill), bao gồm cả
-     `language.response` và `language.documentation` đã chọn
+     (từ template trong thư mục `templates/` của skill) với `schema_version: 1`,
+     bao gồm cả `language.response` và `language.documentation` đã chọn
+   - Tạo `.docstruct/agents.yaml` từ `templates/agents.yaml` nếu chưa có (không bao
+     giờ ghi đè file đã tồn tại khi chưa hỏi)
+   - Ghi `00-common/01-conventions.md` từ `templates/conventions.md` với giá trị Phần B
+     từ bước 3b; tạo `02-references.md`, `03-abbreviations.md`, `04-glossary.md`,
+     `05-traceability.md` dạng placeholder ghi `auto-populated by generate — do not edit manually`
    - Tạo cây thư mục theo dàn ý, mỗi thư mục có `README.md` mô tả phạm vi
    - Tạo README tổng quan tại doc-root kèm lộ trình đọc
+
+### 5.3 RE-INIT: OVERRIDE vs MIGRATE
+
+**Backup trước (bắt buộc cả 2 nhánh):** trước khi đụng vào gì, copy `.docstruct/` +
+cây doc-root sang `.docstruct.backup-<YYYYMMDD-HHmmss>/` và báo đường dẫn backup
+trong reply. Backup lỗi thì dừng và hỏi user.
+
+| | Override (xây lại) | Migrate / Upgrade (tại chỗ) |
+|---|---|---|
+| `project-profile.yaml` | Tạo mới từ template (`schema_version: 1`); hỏi lại language + doc-root | Giữ + merge: giữ `language.*`, `docroot.path`, audience; chỉ điền key thiếu và bump `schema_version` |
+| `schema.yaml` | Tạo mới từ template | Cập nhật tại chỗ: thêm folder/file thiếu, giữ tùy biến đã duyệt; đồng bộ `meta.docroot` + `schema_version` |
+| `agents.yaml` | Tạo mới từ template chỉ khi thiếu hoặc user đồng ý | Giữ config user; chỉ merge key thiếu (agent id mới, `default_reviewer`) |
+| `knowledge/` | **Giữ mặc định** — copy lại từ backup; chỉ bỏ khi user nói rõ | Giữ toàn bộ; rebuild `_index.md` nếu lệch |
+| Nội dung docs | Cây mới (file cũ mất khỏi doc-root — vẫn còn trong backup) | Giữ: không xóa file user đã viết; chỉ tạo folder/file + `README.md` còn thiếu |
+| `00-common/01-conventions.md` | Ghi từ template với Phần B từ bước 3b | Thiếu: seed Phần A + hỏi Phần B. Đã có: giữ Phần B, chỉ refresh Phần A khi user đồng ý |
+| File lệch schema | N/A (mới) | Đề xuất bảng mapping; chỉ move/giữ/archive vào `99-assets/_legacy/` sau khi confirm từng dòng |
+
+Sau cả 2 nhánh, báo cáo: `đường dẫn backup | cái gì được giữ | cái gì xây mới | cái gì cần user rà soát`.
+
+### 5.4 SAU INIT — POPUP LỆNH TIẾP THEO
+
+Khi init (mới, override hay migrate) xong, luôn hiện picker lệnh tiếp theo với **2-3
+gợi ý cụ thể** theo trạng thái mới, vd:
+
+- `generate 01-overview/01-problem-statement.md — mục đích nền tảng còn trống`
+- `config conventions — tinh chỉnh quy ước nếu bước 3b đã dùng default`
+- `remember <fact từ scan> — giữ stack/team facts`
+
+Dùng question/picker nếu có, không thì list đánh số. Chờ user chọn; KHÔNG tự chạy
+`generate` khi chưa confirm.
 
 VÍ DỤ:
 /docstruct init Dự án e-commerce bằng Next.js + PostgreSQL, đội 3 dev
@@ -216,6 +302,8 @@ Không có mô tả: vẫn quét dự án hiện tại trước, rồi hỏi t�
 Xây tài liệu linh hoạt dựa trên thực trạng + vai trò bạn. Hai chế độ:
 
 - `/docstruct generate` — đề xuất 2-3 file tiếp theo để xây, dựa trên thực trạng, không cứng nhắc.
+  Bỏ qua toàn bộ `00-common` — `01-conventions.md` đã chốt lúc `init` (bước 3b),
+  `02-05` auto-populate; điểm bắt đầu viết là `01-overview`.
 - `/docstruct generate <file>` — tập trung vào file chỉ định (vd `02-business/01-value-prop.md`
   hoặc `10-deliverables/01-BRD.md`) để tạo hoặc điều chỉnh. Nếu file đã `RELEASED`,
   cảnh báo và hỏi có update không.
@@ -256,13 +344,12 @@ Không giữ backward: mọi tạo mới/điều chỉnh đều coi như version
    - Hỏi trước: `Bạn là ai trong dự án này? Vai trò gì? (customer / sales / BA / dev / PM)
      — bạn nắm gì nhất?` Lưu vào `knowledge/team-role.md` nếu chưa có (lần sau chỉ
      xác nhận `Vẫn là <role>?`), và vào `elicitation/<target>.md`.
-   - Quét thực trạng: file nào thiếu/trống (`DRAFT`), `UPDATING`, `RELEASED`,
-     `change-requests/CR-*.md` mới. Dùng order chuẩn làm tham chiếu để hiểu tiền đề
-     (vd `01-overview` và `02-business` là tiền đề cho `04-architecture`), nhưng
-     **không cứng nhắc** — hiểu linh hoạt cái gì thực sự cần. Bỏ qua file auto
-     `00-common/02-references, 03-abbreviations, 04-glossary, 05-traceability`
-     (chỉ `01-conventions.md` là manual và có thể đề xuất sớm); điểm bắt đầu viết
-     là `01-overview`, không phải `00-common`.
+    - Quét thực trạng: file nào thiếu/trống (`DRAFT`), `UPDATING`, `RELEASED`,
+      `change-requests/CR-*.md` mới. Dùng order chuẩn làm tham chiếu để hiểu tiền đề
+      (vd `01-overview` và `02-business` là tiền đề cho `04-architecture`), nhưng
+      **không cứng nhắc** — hiểu linh hoạt cái gì thực sự cần. Bỏ qua toàn bộ
+      `00-common` (`01-conventions.md` đã chốt lúc init, `02-05` auto); điểm bắt đầu viết
+      là `01-overview`, không phải `00-common`.
    - Nếu có `<file>`: coi như bạn muốn file đó, nhưng nếu nó phụ thuộc tiền đề chưa
      xong (vd nhắm `04-architecture` trong khi `01-overview/03-goals.md` còn trống),
      giải thích vì sao tiền đề quan trọng và hỏi `Bạn muốn tiếp tục file này hay
@@ -284,8 +371,11 @@ Không giữ backward: mọi tạo mới/điều chỉnh đều coi như version
 4. **Đề xuất outline** — liệt kê section cho file đích, ghi chú nguồn
    (block/folder và file knowledge nào). Chờ duyệt.
 5. **Viết** — tạo/cập nhật file đích trong folder chuẩn (kebab-case + prefix số,
-   Mục 9) bằng văn current-state (Mục 9, không backward). Cập nhật `status:`
-   thành `DRAFT` hoặc `UPDATING`. Nếu có fact mới, cập nhật `knowledge/` nếu cần.
+   Mục 9) bằng văn current-state (Mục 9, không backward). Tuân thủ Phần B của
+   `00-common/01-conventions.md` (diagram tool, API format, tone, thuật ngữ khóa);
+   nếu conventions thiếu chỉ dẫn cho file này thì dùng default hợp lý và ghi chú 1 dòng,
+   không tự sửa conventions. Cập nhật `status:` thành `DRAFT` hoặc `UPDATING`.
+   Nếu có fact mới, cập nhật `knowledge/` nếu cần.
 6. **Tự động cập nhật 00-common** — ngay sau khi viết, quét nội dung mới để tìm
    thuật ngữ, viết tắt, reference chưa có trong `00-common/`. Tự động append vào
    file tương ứng mà không cần lệnh khác:
@@ -300,6 +390,10 @@ Không giữ backward: mọi tạo mới/điều chỉnh đều coi như version
 8. **Confirm & đánh trạng thái** — hỏi `Đánh trạng thái file là? (DRAFT / UPDATING / RELEASED)`.
    Mặc định `RELEASED` nếu user nói đã xong. Cập nhật frontmatter và
    `.docstruct/status/<path>`. `RELEASED` mới được tham chiếu bởi `generate` sau.
+9. **Popup lệnh tiếp theo** — sau khi đánh trạng thái luôn hỏi làm gì tiếp (picker nếu
+   có, không thì list đánh số). Đề xuất 2-3 ứng viên cụ thể theo thực trạng mới (tiền đề
+   + gap), mỗi cái kèm lý do 1 dòng, cộng thêm `review <file vừa xong>` và `dừng`. Chờ
+   user chọn; KHÔNG tự chạy.
 
 VÍ DỤ:
 /docstruct generate
@@ -342,7 +436,7 @@ docs/                        # hoặc .docstruct/docs/ tùy doc-root user chọn
 ├── 10-deliverables/         # 01-BRD.md, 02-PRD.md, 03-SAD.md, 04-FSD.md, 05-SRD.md, 06-Proposal.md, 07-TestPlan.md, 08-Runbook.md, 09-UserAdminGuide.md (placeholder với headings riêng + Ref link, không giống nhau)
 └── 99-assets/               # Hình ảnh, sơ đồ, templates
 
-`init` tạo đủ folder/file trên; mỗi `10-deliverables/*.md` là placeholder với headings riêng kèm `Ref: ../01-overview/...` — không y nhau. `00-common` auto (`02-references, 03-abbreviations, 04-glossary, 05-traceability`) tự sinh bởi `generate`; chỉ `01-conventions.md` là file manual trong `00-common` và nên viết sớm. Điểm bắt đầu viết là `01-overview` (không phải `00-common`).
+`init` tạo đủ folder/file trên; mỗi `10-deliverables/*.md` là placeholder với headings riêng kèm `Ref: ../01-overview/...` — không y nhau. Trong `00-common`, `01-conventions.md` được chốt lúc `init` (bước 3b, 2 lớp: Phần A cố định + Phần B đặc thù dự án, nguồn duy nhất dạng MD), còn `02-references, 03-abbreviations, 04-glossary, 05-traceability` là tham chiếu sống do `generate` auto-populate từ placeholder ghi `auto-populated by generate — do not edit manually`; format `05-traceability.md` là bảng `deliverable | source blocks | block status | knowledge refs`. Điểm bắt đầu viết là `01-overview` (không phải `00-common`).
 
 --- PHÂN ĐỊNH `03-features` VÀ `02-business/use-cases/` ---
 
@@ -409,6 +503,125 @@ Folder chưa cần dùng có thể giữ nguyên `README.md` và ghi chú ngắn
    lý tại `.docstruct/status/`; chỉ block `approved` được đem vào tài liệu tổng
    hợp mà không cần xem lại.
 8. **README con:** mọi thư mục phải có `README.md` mô tả phạm vi và danh sách file.
+
+================================================================================
+10. LỆNH `/docstruct review <chủ đề|file>` - REVIEW PHẢN BIỆN QUA SUBAGENT
+================================================================================
+
+Nghiên cứu, phân tích và đánh giá khách quan một vấn đề, ý tưởng hoặc file docs
+bằng tư duy phản biện và logic. Skill điều phối subagent review ("đệ tử"), rồi tổng
+hợp các báo cáo thành một verdict + đề xuất tiếp theo. **Chỉ-đọc với docs**: không
+bao giờ sửa file được review; chỉ lưu báo cáo vào `.docstruct/reviews/` khi đã hỏi.
+
+CÚ PHÁP:
+
+/docstruct review Có nên dùng microservices cho dự án này?
+/docstruct review 04-architecture/02-components.md
+/docstruct review --no-agents Mô hình pricing hiện tại có lỗ hổng
+
+QUY TRÌNH:
+
+1. **Parse đích + load context (RAG chọn lọc)** — đọc `knowledge/_index.md` (nếu có),
+   chỉ load dòng có domain/tags khớp chủ đề. Nếu đích là đường dẫn docs: đọc file đó +
+   file lân cận cùng folder + glossary. Nếu là text tự do: quét nhẹ repo + doc-root tìm
+   bằng chứng liên quan. Nêu rõ `sources: ...` để reviewer trích dẫn được.
+2. **Chốt reviewer từ `.docstruct/agents.yaml`:**
+   - Thiếu file: dùng 1 `critic` inline với prompt mặc định từ `templates/agents.yaml`
+     (chế độ single-critic).
+   - Có file: hiện agents đang enabled (`id | role`), cho user multi-select (picker nếu
+     có, không thì list đánh số). Pre-select `default_reviewer`. Mặc định là **1 critic**;
+     chỉ chạy multi-agent khi user chọn 2+ agents hoặc chủ đề cần cả research + phản biện.
+   - Cờ `--no-agents` ép chạy single inline critic, bỏ qua config (để debug).
+   - Nếu runtime không có cơ chế subagent (không có Task tool): **fallback inline** — chạy
+     tuần tự từng reviewer trong context hiện tại, gắn nhãn `Reviewer <id> (inline
+     fallback)`, rồi tổng hợp. Không fail chỉ vì thiếu subagent.
+3. **Điều phối reviewer** — mỗi reviewer nhận: nội dung chủ đề/file, tóm tắt context, và
+   `role + prompt` riêng từ `agents.yaml`. Bắt buộc trả về cấu trúc:
+   - `findings:` list (nhận định → bằng chứng `file:line` hoặc `knowledge/<file>`)
+   - `counter-arguments:` góc nhìn đối lập mạnh nhất
+   - `verdict:` agree | conditionally-agree | disagree + lý do
+   - `confidence:` high/medium/low cho từng finding
+   - `open questions:` bằng chứng nào còn thiếu
+   Chạy song song các agents khi runtime hỗ trợ.
+4. **Tổng hợp (skill làm, không phải subagent)** — đối chiếu các báo cáo thành:
+   - `Consensus:` điểm mọi reviewer đồng ý
+   - `Conflicts:` điểm bất đồng (ai nói gì)
+   - `Missing evidence:` cái gì sẽ chốt được mâu thuẫn
+   - `Overall verdict:` agree | conditionally-agree | disagree + rationale 3-5 dòng
+   - `Risks & alternatives:` list ngắn
+   Trả lời bằng `language.response`. Khách quan: báo cáo trung thực bất đồng, không giấu.
+5. **Lưu báo cáo (phải hỏi trước)** — hỏi `Lưu báo cáo review vào .docstruct/reviews/?
+   (save / skip)`. Nếu `save`, ghi `.docstruct/reviews/RR-YYYYMMDD-HHmmss-<slug>.md` với
+   frontmatter (`topic, verdict, reviewers, date, sources`) + synthesis + tóm tắt từng
+   reviewer. Không lưu khi chưa hỏi.
+6. **Popup tiếp theo** — sau synthesis luôn đề xuất follow-up (picker nếu có): vd
+   `generate <file liên quan>`, `remember <fact mới lộ ra>`, `review lại với thêm bằng
+   chứng`, `dừng`. Chờ pick; KHÔNG tự chạy.
+
+VÍ DỤ:
+
+/docstruct review Có nên dùng microservices cho dự án này?
+/docstruct review 05-security/01-threat-model.md
+/docstruct review --no-agents SLA hiện tại có thực tế không?
+
+================================================================================
+11. LỆNH `/docstruct config` - HUB CẤU HÌNH (agents | conventions | language)
+================================================================================
+
+Hub tập trung cho cấu hình skill. Ba nhánh, không có `doc-root` ở đây (đổi doc-root
+là migrate nặng — giữ trong `init`).
+
+### 11.1 HUB (không tham số)
+
+/docstruct config               → picker hub (chỉ-đọc cho đến khi chọn nhánh)
+/docstruct config agents        → vào thẳng §11.2
+/docstruct config conventions   → vào thẳng §11.3
+/docstruct config language      → vào thẳng §11.4
+
+QUY TRÌNH:
+
+1. Đọc state: `agents.yaml` (có? N enabled, default?), Phần B của
+   `00-common/01-conventions.md` (bảng 6 giá trị hoặc `missing`),
+   `language.response/documentation` từ `project-profile.yaml`.
+2. Hiện picker (picker tool nếu có, không thì list đánh số), mỗi dòng kèm 1 dòng trạng thái:
+   - `1. agents — subagent review (N enabled, default: <id>)`
+   - `2. conventions — quy ước đặc thù (diagram, API format, tone, approver...)`
+   - `3. language — ngôn ngữ trả lời + ngôn ngữ tài liệu`
+3. Vào nhánh được chọn. Xong nhánh thì hỏi `về hub / dừng`. Arg lạ →
+   `Unknown command 'config X'. Valid: agents, conventions, language.` rồi hiện hub.
+
+### 11.2 NHÁNH: agents - QUẢN LÝ SUBAGENT REVIEW
+
+Quản lý cấu hình `.docstruct/agents.yaml`:
+
+1. Thiếu file thì tạo từ `templates/agents.yaml` của skill rồi hiện nội dung.
+2. Có file thì liệt kê `id | role | enabled | default?`.
+3. Cho chọn thao tác (picker nếu có, không thì list số): `thêm agent | sửa role/prompt |
+   bật / tắt | đặt default_reviewer | reset từ template (hỏi trước khi ghi đè prompt custom)`.
+4. Sau đổi, render lại list và nhắc `/docstruct review` sẽ offer các agents này để chọn.
+   `init` không bao giờ ghi đè `agents.yaml` đã có khi chưa hỏi (chỉ merge key thiếu) —
+   xem Mục 5.3.
+
+### 11.3 NHÁNH: conventions - SỬA QUY ƯỚC ĐẶC THÙ
+
+Sửa Phần B của `00-common/01-conventions.md` (Phần A do skill cố định):
+
+1. Hiện Phần B hiện tại dạng bảng `mục | giá trị`; Phần A chỉ hiện 6 bullet tiêu đề
+   (full text khi user yêu cầu).
+2. Cho sửa từng mục (picker nếu có, không thì list số): diagram tool | API format |
+   tone & depth | người duyệt RELEASED | thuật ngữ khóa | deliverable ưu tiên. Mỗi mục
+   kèm default suy từ scan.
+3. `reset` seed lại Phần A từ `templates/conventions.md` và **giữ nguyên Phần B**.
+   Confirm trước mọi ghi file.
+4. Sau lưu, hỏi `review các file RELEASED chịu ảnh hưởng?` — chỉ gợi ý lệnh `review`,
+   không bao giờ tự sửa file RELEASED. `init`/`migrate` không ghi đè Phần B khi chưa hỏi
+   (xem Mục 5.3).
+
+### 11.4 NHÁNH: language - NGÔN NGỮ TRẢ LỜI + TÀI LIỆU
+
+1. Hiện `language.response` + `language.documentation` từ `.docstruct/project-profile.yaml`
+   (kèm định nghĩa `vi` vs `vi-en` ở Mục 9).
+2. Cho đổi với option `en | vi | vi-en` tùy mục; confirm trước khi ghi vào `project-profile.yaml`.
 
 ================================================================================
 HẾT — Bản chính thức để agent thực thi là SKILL.md

@@ -6,13 +6,14 @@
 meta:
   docroot: ""                 # must match project-profile.yaml
   approved_at: ""             # YYYY-MM-DD
+  schema_version: 1           # must match project-profile.yaml schema_version
 
 structure:
   - folder: 00-common
     purpose: "Conventions, references, abbreviations, glossary, traceability (glossary auto, conventions manual)"
     readme: true
     files:
-      - 01-conventions.md       # Manual — should be written early, others auto
+      - 01-conventions.md       # Manual — decided during init (§5.2 step 3b), editable via /docstruct config conventions; single source (MD-only)
       - 02-references.md        # Auto — appended by generate
       - 03-abbreviations.md     # Auto — appended by generate
       - 04-glossary.md          # Auto — appended by generate (was 01, moved to 04 so 00-common not the starting point)

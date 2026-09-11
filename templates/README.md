@@ -59,4 +59,4 @@ Read in the following order, from high-level to details:
 
 - Each file is an atomic content block; complete documents under `10-deliverables/` are aggregations.
 - Block lifecycle: `draft → review → approved` (tracked in `.docstruct/status/`).
-- Quality review reports are stored in `issues/`.
+- Quality review reports are stored in `.docstruct/reviews/`.

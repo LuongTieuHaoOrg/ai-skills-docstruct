@@ -1,6 +1,6 @@
 ---
 name: docstruct
-description: Manage project documentation structure using the Atomic Content Blocks model. Use when the user wants to initialize a documentation structure for a new project, organize/refactor existing documentation, aggregate complete documents (BRD, PRD, SAD, FSD...) from existing content blocks, or manage project knowledge memory via remember/knowledge. Run /docstruct with no args to see current structure and command help.
+description: Manage project documentation structure using the Atomic Content Blocks model. Use when the user wants to initialize a documentation structure for a new project, organize/refactor existing documentation, aggregate complete documents (BRD, PRD, SAD, FSD...) from existing content blocks, critically review a problem/file via subagent reviewers, or manage project knowledge memory via remember/knowledge. Run /docstruct with no args to scan the project and pick the next action.
 ---
 
 # Docstruct — Documentation Structure Skill
@@ -30,8 +30,9 @@ The skill stores all configuration and state in `.docstruct/` at the project roo
 
 ```
 .docstruct/
-├── project-profile.yaml   # Project profile: type, audience, doc-root, language settings
-├── schema.yaml            # Approved folder tree + aggregation matrix
+├── project-profile.yaml   # Project profile: type, audience, doc-root, language settings, schema_version
+├── schema.yaml            # Approved folder tree + aggregation matrix (+ schema_version)
+├── agents.yaml            # Review subagent ("đệ tử") configuration — see Section 10
 ├── status/                # Per-block status: DRAFT | UPDATING | RELEASED
 ├── knowledge/             # Project knowledge memory — selective RAG (see Section 4)
 │   ├── _index.md          # Lookup: file | domain | summary | tags
@@ -39,8 +40,9 @@ The skill stores all configuration and state in `.docstruct/` at the project roo
 │   ├── technical-*.md
 │   ├── team-*.md
 │   └── common-*.md
-└── elicitation/           # Interim Q&A for generate (see Section 6)
-    └── <sanitized-path>.md
+├── elicitation/           # Interim Q&A for generate (see Section 6)
+│   └── <sanitized-path>.md
+└── reviews/               # Saved review reports: RR-YYYYMMDD-HHmmss-<slug>.md (see Section 10)
 ```
 
 > **Important:** `project-profile.yaml` records the **doc-root** — the documentation location chosen by the user during `init`. Every command (`generate`, `remember`, `knowledge`) must read this config before operating. Never guess the doc-root.
@@ -51,24 +53,37 @@ The skill stores all configuration and state in `.docstruct/` at the project roo
 
 > **Language settings:** `project-profile.yaml` also records the **reply language** (`language.response`) and the **documentation language** (`language.documentation`). These are the single source of truth for all communication and content decisions — see Section 9. If they are empty or missing, ask the user before running any command.
 
-## 3. Command `/docstruct` (no args) — Help & Status Dashboard
+## 3. Command `/docstruct` (no args) — Project Scan + Status Dashboard + Action Picker
 
-When the user runs `/docstruct` with no arguments, or with arguments that do not match any configured command, do NOT execute a workflow. Instead show the help dashboard:
+When the user runs `/docstruct` with no arguments, or with arguments that do not match any configured command, do NOT execute a workflow. Instead run a **deep read-only scan** and show the dashboard + action picker:
 
-1. **Read state** — if `.docstruct/project-profile.yaml` and `.docstruct/schema.yaml` exist, read `docroot` and list the actual folder tree under doc-root (for each of `00-common` → `99-assets` show exists/missing and file count). If not initialized, show `Not initialized` and display the standard tree from Section 8 as preview.
-2. **Check knowledge** — if `.docstruct/knowledge/_index.md` exists, show `Knowledge: N files` and the first 5 index rows; otherwise show `Knowledge: (empty)`.
-3. **Show command summary:**
+1. **Deep scan (read-only)** —
+   - If `.docstruct/project-profile.yaml` and `.docstruct/schema.yaml` exist: read `docroot`, `language.*`, `schema_version`; list the actual folder tree under doc-root (for each of `00-common` → `99-assets` show exists/missing, file count, and DRAFT/UPDATING/RELEASED breakdown from frontmatter `status:` + `.docstruct/status/`).
+   - If not initialized: show `Not initialized` and display the standard tree from Section 8 as preview.
+   - Check knowledge: if `.docstruct/knowledge/_index.md` exists, show `Knowledge: N files` and the first 5 index rows; otherwise show `Knowledge: (empty)`.
+   - Check agents config: if `.docstruct/agents.yaml` exists, show `Agents: <ids> (default: <id>)`; otherwise show `Agents: (default inline critic)`.
+   - Scan the repo lightly: README (business domain, key features), top-level source tree + tech stack signals (package.json / requirements / go.mod / pom.xml / Cargo.toml...), code scale estimate, docs files lying outside doc-root (if any).
+   - Synthesize a **Project Note**: 5–8 lines on current state — initialized?, doc-root, docs coverage (% RELEASED), biggest gaps (top-3 empty folders/files), tech stack, knowledge depth.
+2. **Show command summary:**
 
    | Command | When to use | Example |
    |---------|-------------|---------|
-   | `/docstruct init <description>` | Initialize structure (12 folders) | `/docstruct init E-commerce Next.js + PostgreSQL` |
+   | `/docstruct init <description>` | Initialize structure (12 folders), or re-init / migrate if already initialized | `/docstruct init E-commerce Next.js + PostgreSQL` |
    | `/docstruct generate` | Build next doc in order (role-adaptive Q&A) | `/docstruct generate` |
    | `/docstruct generate <file>` | Focus on a specific file | `/docstruct generate 02-business/01-value-prop.md` |
+   | `/docstruct review <topic\|file>` | Critically review a problem/file via subagent reviewer(s) | `/docstruct review Should we use microservices?` |
    | `/docstruct remember <free text>` | Record knowledge (analyze → confirm → save) | `/docstruct remember STID is my company` |
    | `/docstruct knowledge` | List all knowledge files | `/docstruct knowledge` |
+   | `/docstruct config [agents\|conventions\|language]` | Manage skill config via hub picker (subagents, conventions, language) | `/docstruct config` |
 
-4. **Show Aggregation Matrix (compact)** — BRD/PRD/SAD/FSD source folders from Section 7.
-5. **Do not create or modify any file.** If the first token is unknown (e.g. `/docstruct foo`), prefix the dashboard with `Unknown command 'foo'. Valid: init, generate, remember, knowledge.` and suggest the closest match. Also handle `help`, `--help`, `-h` as aliases for this dashboard. Matching is case-insensitive, trim whitespace.
+3. **Show Aggregation Matrix (compact)** — BRD/PRD/SAD/FSD source folders from Section 7.
+4. **Action picker (popup)** — after the dashboard, always ask the user what to do next (use the agent's question/picker tool when available, otherwise a numbered list). Pre-suggest **2–3 smart recommendations** based on the scan, e.g.:
+   - Not initialized → recommend `init`.
+   - `01-overview` / `02-business` empty → recommend `generate <that file>`.
+   - Many files `RELEASED` but no recent review → recommend `review <topic>`.
+   - Knowledge empty → recommend `remember <seed facts>`.
+   The user may pick a suggestion or name any other command. Do NOT auto-run the picked command's side effects without the normal confirmations of that command.
+5. **Do not create or modify any file.** If the first token is unknown (e.g. `/docstruct foo`), prefix the dashboard with `Unknown command 'foo'. Valid: init, generate, review, remember, knowledge, config.` and suggest the closest match. Also handle `help`, `--help`, `-h` as aliases for this dashboard. Matching is case-insensitive, trim whitespace.
 
 ## 4. Command `/docstruct remember / knowledge` — Project Knowledge Memory (Selective RAG)
 
@@ -123,9 +138,20 @@ Unknown subcommand for this group → `Unknown command 'X'. Valid: remember <fre
 
 ## 5. Command `/docstruct init <project description>`
 
-Initialize the documentation structure for a project.
+Initialize the documentation structure for a project. Handles both fresh init and re-init of an already-initialized project.
 
-### Required workflow
+### 5.1 Detect existing state
+
+1. **Scan first** — same deep scan as Section 3: README, source tree + tech stack, existing docs (inside and outside doc-root), `.docstruct/` state (`project-profile.yaml`, `schema.yaml`, `schema_version`, knowledge file count, agents config).
+2. **If `.docstruct/` already exists** (re-init path) — show what exists (profile, schema_version, doc-root, docs file count, knowledge N files) and ask:
+   - `[1] Override — rebuild from scratch` (fresh `.docstruct` + doc tree from templates)
+   - `[2] Migrate / Upgrade — update structure in place, keep content` (recommended when docs/knowledge already have value)
+   - `[3] Cancel`
+   
+   Do NOT proceed without an explicit choice.
+3. **If fresh** — continue with the required workflow below (§5.2).
+
+### 5.2 Required workflow (fresh init)
 
 1. **Scan the project** — read README, source code (tree structure, main technologies), and any existing docs to synthesize context: business domain, key features, code scale, technical constraints.
 2. **Proactively ask clarifying questions** — ask the user, offering suggestions based on scan results:
@@ -139,11 +165,48 @@ Initialize the documentation structure for a project.
 3. **Ask for the doc-root** — the user chooses:
    - `docs/` (traditional documentation folder), or
    - `.docstruct/docs/` (contained within the skill workspace)
-4. **Confirm the outline** — present the folder tree + specific file list; wait for user approval. If the project already has non-conforming documentation, propose a reorganization plan (migration mapping table) in this step.
+3b. **Decide conventions (compact, 4–6 questions)** — Part A (fixed by skill: file naming, SSOT, status lifecycle, language ref, images, auto-file rule) is seeded from `templates/conventions.md` without asking; show it as read-only preview. Ask only Part B (project-specific), offering scan-based defaults:
+   - Diagram tool: `mermaid | plantuml | drawio` (+ image fallback)
+   - API spec format: `openapi-yaml | md-table | both`
+   - Tone & depth: `high-level | balanced | deep-dive` (sync with `audience.technical_depth`)
+   - RELEASED approver: single name/role, or per-domain approvers
+   - Locked terms: product/brand terms with fixed spelling, or `(none)`
+   - Priority deliverables: which of BRD/PRD/SAD/... first, or `(all)`
+   
+   Unanswered items use the stated defaults. Write `00-common/01-conventions.md` immediately (status RELEASED, single source MD-only — no YAML mirror).
+4. **Confirm the outline** — present the folder tree + specific file list (including the decided conventions); wait for user approval. If the project already has non-conforming documentation, propose a reorganization plan (migration mapping table `old path → new path | keep / move / archive to 99-assets/_legacy/`) in this step.
 5. **Initialize** — after approval:
-   - Create `.docstruct/project-profile.yaml` and `.docstruct/schema.yaml` (from templates in the skill's `templates/` directory), including the chosen `language.response` and `language.documentation`
+   - Create `.docstruct/project-profile.yaml` and `.docstruct/schema.yaml` (from templates in the skill's `templates/` directory) with `schema_version: 1`, including the chosen `language.response` and `language.documentation`
+   - Create `.docstruct/agents.yaml` from `templates/agents.yaml` if it does not exist (never overwrite an existing one without asking)
+   - Write `00-common/01-conventions.md` from `templates/conventions.md` with the Part B values from step 3b; create `02-references.md`, `03-abbreviations.md`, `04-glossary.md`, `05-traceability.md` as placeholders marked `auto-populated by generate — do not edit manually`
    - Create the folder tree per the outline, each folder gets a `README.md` describing its scope
    - Create a root overview README at the doc-root including the reading path
+
+### 5.3 Re-init: Override vs Migrate
+
+**Backup first (mandatory for both branches):** before touching anything, copy `.docstruct/` + the doc-root tree to `.docstruct.backup-<YYYYMMDD-HHmmss>/` and report the backup path in the reply. If backup fails, stop and ask the user.
+
+| | Override (rebuild) | Migrate / Upgrade (in place) |
+|---|---|---|
+| `.docstruct/project-profile.yaml` | Recreate from template (new `schema_version: 1`); re-ask language + doc-root | Keep + merge: preserve `language.*`, `docroot.path`, audience; only fill missing keys and bump `schema_version` |
+| `.docstruct/schema.yaml` | Recreate from template | Update in place: add missing folders/files, keep approved customizations; sync `meta.docroot` + `schema_version` |
+| `.docstruct/agents.yaml` | Recreate from template only if missing or user confirms | Keep user config; only merge missing keys (new agent ids, `default_reviewer`) |
+| `knowledge/` | **Preserved by default** — copy back from backup; only drop if user explicitly says so | Fully preserved; `_index.md` rebuilt if inconsistent |
+| Docs content | Fresh tree (user files gone from doc-root — still in backup) | Kept: never delete a user-written file; create only missing folders/files + missing `README.md` |
+| `00-common/01-conventions.md` | Written from template with Part B from step 3b | If missing: seed Part A + ask Part B. If exists: keep Part B, refresh Part A only on user confirm |
+| Off-schema files | N/A (fresh) | Propose mapping table; move to canonical path / keep / archive to `99-assets/_legacy/` only after per-row confirmation |
+
+After either branch, report: `backup path | what was kept | what was rebuilt | what needs user review (mapping leftovers)`.
+
+### 5.4 After init — next-step popup
+
+When init (fresh, override, or migrate) completes, always show a next-step picker with **2–3 concrete smart suggestions** derived from the new state, e.g.:
+
+- `generate 01-overview/01-problem-statement.md — foundational purpose is still empty`
+- `config conventions — refine project-specific conventions if step 3b used defaults`
+- `remember <seed fact from scan> — preserve stack/team facts`
+
+Use the agent's question/picker tool when available, otherwise a numbered list. Wait for the user's pick; do NOT auto-run `generate` without confirmation.
 
 ### Examples
 
@@ -152,13 +215,13 @@ Initialize the documentation structure for a project.
 /docstruct init
 ```
 
-With no description: still scan the current project first, then start asking from step 2.
+With no description: still scan the current project first, then start asking from step 2 of §5.2.
 
 ## 6. Command `/docstruct generate` / `generate <file>` — Build Docs in Order (Role-Adaptive)
 
 Build documentation flexibly based on current state + your role. Two modes:
 
-- `/docstruct generate` — propose 2–3 next files to build, based on reality, not rigid order. Skips auto `00-common` files (02-references, 03-abbreviations, 04-glossary, 05-traceability) — they are auto-populated; only `00-common/01-conventions.md` is proposed manually and early.
+- `/docstruct generate` — propose 2–3 next files to build, based on reality, not rigid order. Skips all `00-common` files — `01-conventions.md` is decided during `init` (§5.2 step 3b) and `02-references, 03-abbreviations, 04-glossary, 05-traceability` are auto-populated; start writing at `01-overview`.
 - `/docstruct generate <file>` — focus on a specific file (e.g. `02-business/01-value-prop.md` or `10-deliverables/01-BRD.md`) to create or adjust it. If the file is `RELEASED`, warn and ask to update.
 
 ### Ordered index
@@ -184,7 +247,7 @@ No backward compatibility: every creation or adjustment is treated as the **firs
 1. **Selective RAG** — read `knowledge/_index.md` (if exists), pick rows whose domain/tags match the target file (`business` for BRD/Proposal, `technical`+`architecture` for SAD/FSD, `team` for people), load only those knowledge files.
 2. **Ask who you are & propose next file based on reality:**
    - Ask first: `Who are you in this project? What is your role? (customer / sales / BA / dev / PM) — what do you know best about?` Save answer to `knowledge/team-role.md` if not yet stored (or confirm `Still <role>?`), and also to `elicitation/<target>.md`.
-   - Scan the current docs reality: which files are missing/empty (`DRAFT`), which are `UPDATING`, which are `RELEASED`, which `change-requests/CR-*.md` are new. Use the canonical order as reference to understand prerequisites (e.g. `01-overview` and `02-business` are prerequisites for `04-architecture`), but **do not enforce rigidly** — understand flexibly what is actually needed. Skip auto files `00-common/02-references, 03-abbreviations, 04-glossary, 05-traceability` (only `01-conventions.md` is manual and may be proposed early); start writing at `01-overview`, not `00-common`.
+    - Scan the current docs reality: which files are missing/empty (`DRAFT`), which are `UPDATING`, which are `RELEASED`, which `change-requests/CR-*.md` are new. Use the canonical order as reference to understand prerequisites (e.g. `01-overview` and `02-business` are prerequisites for `04-architecture`), but **do not enforce rigidly** — understand flexibly what is actually needed. Skip the whole `00-common` folder (`01-conventions.md` is decided at init, `02-05` are auto); start writing at `01-overview`, not `00-common`.
    - If `<file>` was given: treat it as the user's preference, but if it depends on an unfinished prerequisite (e.g. targeting `04-architecture` while `01-overview/03-goals.md` is still empty), explain why the prerequisite matters and ask `Do you want to continue with this file or switch to the prerequisite?`.
    - If no `<file>`: propose **2–3 candidates** for the next file, each with a one-line reason (e.g. `1. 01-overview/01-problem-statement.md — foundational purpose is still empty; 2. 02-business/01-value-prop.md — business value needed before architecture`). Let the user pick. If the user picks none, they can specify another file.
    - Once a target is chosen/confirmed, read its existing content if any (`UPDATING` case) and nearby files in the same folder + glossary for context. Note current status (`DRAFT` if new, `UPDATING` if exists).
@@ -193,7 +256,7 @@ No backward compatibility: every creation or adjustment is treated as the **firs
    - Append Q&A to the elicitation file.
    - Analyze: check which required sections of the target file (per schema) are still missing. If incomplete, ask another 3–5 follow-up questions, append to elicitation file, repeat until sufficient.
 4. **Propose outline** — list sections for the target file, annotating source (which block/folder and which knowledge files). Wait for outline approval.
-5. **Write** — create/update the target file in its canonical folder (kebab-case + numeric prefix, Section 9) using current-state style (Section 9, no backward). Update `status:` frontmatter to `DRAFT` or `UPDATING` as appropriate. If knowledge facts were introduced, also update `knowledge/` if needed. Record `related_paths` if any.
+5. **Write** — create/update the target file in its canonical folder (kebab-case + numeric prefix, Section 9) using current-state style (Section 9, no backward). Follow `00-common/01-conventions.md` Part B (diagram tool, API spec format, tone & depth, locked terms); if conventions lack guidance for this file, use the sensible default and note it in one line without editing conventions. Update `status:` frontmatter to `DRAFT` or `UPDATING` as appropriate. If knowledge facts were introduced, also update `knowledge/` if needed. Record `related_paths` if any.
 6. **Auto-update 00-common** — immediately after writing, scan the new content for glossary terms, abbreviations, and references not yet in `00-common/`. Auto-append them to the corresponding file without requiring another command:
    - New term → append to `00-common/04-glossary.md` with one-line definition inferred from context; if `vi-en` mode, add English gloss.
    - New abbreviation → append to `00-common/03-abbreviations.md`.
@@ -201,6 +264,7 @@ No backward compatibility: every creation or adjustment is treated as the **firs
    No confirmation needed; just note `Auto-updated 00-common: +2 terms, +1 abbreviation.` in the reply. Deduplicate before appending and respect `status: RELEASED` — still auto-append even to RELEASED `00-common` files (they are living references).
 7. **Elicitation cleanup** — ask `Keep elicitation file for reference or delete? (keep / delete)`. Act accordingly.
 8. **Confirm & mark status** — ask `Mark this file as? (DRAFT / UPDATING / RELEASED)`. Default is `RELEASED` if the user says the file is done. Update frontmatter and `.docstruct/status/<path>` accordingly. `RELEASED` files become referenceable by later `generate` runs.
+9. **Next-step popup** — after marking status, always ask what to do next (picker tool when available, otherwise numbered list). Propose 2–3 concrete candidates based on the fresh reality scan (prerequisites + gaps), each with a one-line reason, plus `review <just-finished file>` and `stop`. Example: `1. generate 02-business/01-value-prop.md — business value needed before architecture; 2. review 01-overview/01-problem-statement.md — just RELEASED, worth a critic pass; 3. stop`. Wait for the pick; do NOT auto-run.
 
 ### Examples
 
@@ -244,7 +308,7 @@ docs/                        # or .docstruct/docs/ depending on user-chosen doc-
 └── 99-assets/               # Images, diagrams, templates
 ```
 
-`init` creates all folders/files above; each `10-deliverables/*.md` is a placeholder with its own headings plus `Ref: ../01-overview/...` links — not identical templates. `00-common` auto files (`02-references, 03-abbreviations, 04-glossary, 05-traceability`) are living references auto-populated by `generate`; `00-common/01-conventions.md` is the only manual file in `00-common` and should be written early. `01-overview` is the starting point for writing (not `00-common`).
+`init` creates all folders/files above; each `10-deliverables/*.md` is a placeholder with its own headings plus `Ref: ../01-overview/...` links — not identical templates. In `00-common`, `01-conventions.md` is decided during `init` (§5.2 step 3b, 2 layers: fixed Part A + project-specific Part B, MD-only single source) while `02-references, 03-abbreviations, 04-glossary, 05-traceability` are living references auto-populated by `generate` from placeholders marked `auto-populated by generate — do not edit manually`; `05-traceability.md` format is a table `deliverable | source blocks | block status | knowledge refs`. `01-overview` is the starting point for writing (not `00-common`).
 
 ### Distinguishing `03-features` from `02-business/use-cases/`
 
@@ -288,3 +352,93 @@ Folders not yet needed may stay with their `README.md` and a short `> Out of sco
 6. **Images/diagrams:** store in `99-assets/`, reference via relative paths; no inline base64.
 7. **Block lifecycle:** each block has status `draft → review → approved`, tracked in `.docstruct/status/`; only `approved` blocks may be aggregated into deliverables without further review.
 8. **Sub-READMEs:** every folder must have a `README.md` describing its scope and file list.
+
+## 10. Command `/docstruct review <topic|file>` — Critical Review via Subagent Reviewers
+
+Objectively research, analyze and evaluate a problem, idea, or doc file using critical thinking and logic. The skill dispatches reviewer subagent(s) ("đệ tử"), then synthesizes their reports into one verdict plus follow-up proposals. **Read-only on docs**: never edits the reviewed file; only optionally saves a report under `.docstruct/reviews/` after asking.
+
+### Syntax
+
+```
+/docstruct review Should we use microservices for this project?
+/docstruct review 04-architecture/02-components.md
+/docstruct review --no-agents The current pricing model has a flaw
+```
+
+### Workflow
+
+1. **Parse target + load context (selective RAG)** — read `knowledge/_index.md` (if exists), load only rows whose domain/tags match the topic. If the target is a doc path: read that file + nearby files in the same folder + glossary. If it is a free-text problem: lightly scan repo + doc-root for relevant evidence. State what was loaded (`sources: ...`) so reviewers can cite it.
+2. **Resolve reviewers from `.docstruct/agents.yaml`:**
+   - If the file is missing: use a single inline `critic` with the default prompt from `templates/agents.yaml` (single-critic mode).
+   - If the file exists: show enabled agents (`id | role`) and let the user multi-select (picker tool when available, otherwise numbered list). Pre-select `default_reviewer`. Default mode is **single critic**; multi-agent runs only when the user selects 2+ agents or the topic explicitly needs research + critique.
+   - `--no-agents` flag forces single inline critic, ignoring the config (useful for debugging).
+   - If the runtime has no subagent mechanism (no Task tool): **inline fallback** — run each selected reviewer sequentially in the current context, clearly labeled `Reviewer <id> (inline fallback)`, then synthesize. Never fail just because subagents are unavailable.
+3. **Dispatch reviewers** — each reviewer receives: the topic/file content, the loaded context summary, and its own `role + prompt` from `agents.yaml`. Require a structured return:
+   - `findings:` bullet list (claim → evidence `file:line` or `knowledge/<file>`)
+   - `counter-arguments:` strongest opposing views
+   - `verdict:` agree | conditionally-agree | disagree + reasons
+   - `confidence:` high/medium/low per finding
+   - `open questions:` what evidence is still missing
+   Run selected agents in parallel when the runtime supports it.
+4. **Synthesize (skill, not a subagent)** — cross-check reports into:
+   - `Consensus:` points all reviewers agree on
+   - `Conflicts:` points they disagree on (with who-says-what)
+   - `Missing evidence:` what would settle the conflicts
+   - `Overall verdict:` agree | conditionally-agree | disagree + 3–5 line rationale
+   - `Risks & alternatives:` short list
+   Reply in `language.response`. Be objective: report disagreements honestly instead of hiding them.
+5. **Save report (ask first)** — ask `Save review report to .docstruct/reviews/? (save / skip)`. On `save`, write `.docstruct/reviews/RR-YYYYMMDD-HHmmss-<slug>.md` with frontmatter (`topic, verdict, reviewers, date, sources`) + the synthesis + per-reviewer summaries. Never save without asking.
+6. **Next-step popup** — after the synthesis, always propose follow-ups (picker when available): e.g. `generate <related file>`, `remember <new fact surfaced>`, `review again with more evidence`, `stop`. Wait for the pick; do NOT auto-run.
+
+### Examples
+
+```
+/docstruct review Should we use microservices for this project?
+/docstruct review 05-security/01-threat-model.md
+/docstruct review --no-agents Is the current SLA realistic?
+```
+
+## 11. Command `/docstruct config` — Config Hub (agents | conventions | language)
+
+Central hub for skill configuration. Three branches, no `doc-root` here (changing doc-root is a heavy migrate — keep it in `init`).
+
+### 11.1 Hub (no args)
+
+```
+/docstruct config               → hub picker (read-only until a branch is chosen)
+/docstruct config agents        → straight into §11.2
+/docstruct config conventions   → straight into §11.3
+/docstruct config language      → straight into §11.4
+```
+
+Workflow:
+
+1. Read state: `agents.yaml` (exists? N enabled, default?), `00-common/01-conventions.md` Part B values (6-row table or `missing`), `language.response/documentation` from `project-profile.yaml`.
+2. Show picker (picker tool when available, otherwise numbered list), each row with a one-line status:
+   - `1. agents — reviewer subagents (N enabled, default: <id>)`
+   - `2. conventions — project-specific conventions (diagram, API format, tone, approver...)`
+   - `3. language — reply + documentation language`
+3. Enter the chosen branch. After a branch finishes, ask `back to hub / stop`. Unknown arg → `Unknown command 'config X'. Valid: agents, conventions, language.` then show the hub.
+
+### 11.2 Branch: agents — Manage Reviewer Subagents
+
+Manage the `.docstruct/agents.yaml` configuration:
+
+1. If the file is missing, create it from the skill's `templates/agents.yaml` and show its contents.
+2. Otherwise list enabled/disabled agents as `id | role | enabled | default?`.
+3. Offer operations (picker when available, otherwise numbered list): `add agent | edit role/prompt | enable / disable | set default_reviewer | reset from template (ask before overwriting custom prompts)`.
+4. After any change, re-render the list and remind that `/docstruct review` will offer these agents for selection. `init` never overwrites an existing `agents.yaml` without asking (it only merges missing keys) — see Section 5.3.
+
+### 11.3 Branch: conventions — Edit Project-Specific Conventions
+
+Edit Part B of `00-common/01-conventions.md` (Part A is fixed by the skill):
+
+1. Show current Part B as table `item | value`; show Part A as 6 bullet titles only (full text on request).
+2. Offer per-item edit (picker when available, otherwise numbered list): diagram tool | API spec format | tone & depth | RELEASED approver | locked terms | priority deliverables. Each item offers scan-based defaults.
+3. `reset` re-seeds Part A from `templates/conventions.md` and **keeps Part B**. Confirm before any write.
+4. After saving, ask `review RELEASED files affected by this change?` — only suggest the `review` command, never auto-edit RELEASED files. `init`/`migrate` never overwrite Part B without asking (see Section 5.3).
+
+### 11.4 Branch: language — Reply + Documentation Language
+
+1. Show current `language.response` + `language.documentation` from `.docstruct/project-profile.yaml` (with `vi` vs `vi-en` definitions from Section 9).
+2. Offer change with `en | vi | vi-en` options as applicable; confirm before writing back to `project-profile.yaml`.
