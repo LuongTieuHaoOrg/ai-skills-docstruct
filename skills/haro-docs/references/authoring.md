@@ -15,7 +15,17 @@
      | `vi` | Pure Vietnamese; English kept ONLY for proper nouns / product / technology names with no Vietnamese equivalent (code, Java, PostgreSQL, REST API...) | "Hệ thống chạy trên PostgreSQL" |
      | `vi-en` | Vietnamese with an English gloss in parentheses on FIRST use of each specialized term; register all glossed terms in `glossary.md` | "Cơ sở dữ liệu (database) lưu trữ hồ sơ" |
 
-     The distinction between the last two: in `vi`, English appears because *no Vietnamese equivalent exists*; in `vi-en`, English glosses are used proactively to *teach terminology* so readers can research further.
+      The distinction between the last two: in `vi`, English appears because *no Vietnamese equivalent exists*; in `vi-en`, English glosses are used proactively to *teach terminology* so readers can research further.
+
+      **`vi` in detail — pure Vietnamese.** English appears ONLY where Vietnamese has no word: proper nouns, product/technology names, code identifiers (PostgreSQL, REST API, `userId`...). Never translate a proper noun into Vietnamese, never add an English gloss in parentheses.
+      - Right: "Hệ thống chạy trên PostgreSQL và expose REST API."
+      - Wrong: "Cơ sở dữ liệu (database) lưu trữ hồ sơ." — parenthesized glosses belong to `vi-en`; in `vi` write just "Cơ sở dữ liệu".
+
+      **`vi-en` in detail — Vietnamese that teaches terminology.** On the FIRST use of each specialized/domain term, add the English origin in parentheses and register the term in `glossary.md`; later occurrences use Vietnamese only.
+      - First use: "Cơ sở dữ liệu (database) lưu trữ hồ sơ." Later: "Cơ sở dữ liệu được backup hằng ngày."
+      - Gloss ONLY specialized/domain terms (database, deployment, stakeholder...). Do NOT gloss everyday words — "Hệ thống (system) chạy (run)" is noise. Do NOT gloss proper nouns — they stay bare as in `vi`.
+
+      **How to choose:** readers work purely in Vietnamese → `vi`; readers will consult English sources later → `vi-en`, so the doc teaches each term at first contact.
    - **Fallback:** if either language setting is empty or missing, ASK the user to decide before running any command. Never assume a default.
 3. **Write current state, not changes — no backward compatibility:** when creating or updating any block/document (new or adjustment), always treat it as the **first version**. Write the final content as if written from scratch today. A document describes how things ARE, never how they CHANGED. Do NOT keep backward compatibility: never mention backward, previous version, migration from old, or version history. Forbidden in document bodies: change-log phrasing such as "updated...", "added...", "removed...", "no longer applies...", "previously...", "backward compatible", "previous version", "migration". Do not embed version history, revision notes, or "what's new" sections anywhere — version control is handled by **git alone**.
 

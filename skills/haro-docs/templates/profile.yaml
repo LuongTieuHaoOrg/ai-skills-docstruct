@@ -25,11 +25,14 @@ language:
 
 # Language mode definitions (documentation):
 #   en    — pure English.
-#   vi    — pure Vietnamese; English kept ONLY for proper nouns / product /
+#   vi    — pure Vietnamese. English ONLY for proper nouns / product /
 #           technology names with no Vietnamese equivalent (code, Java,
-#           PostgreSQL, REST API...). Example: "He thong chay tren PostgreSQL".
-#   vi-en — Vietnamese with English gloss in parentheses on FIRST use of each
-#           specialized term; register all glossed terms in glossary.md.
+#           PostgreSQL, REST API...). No parenthesized glosses.
+#           Example: "He thong chay tren PostgreSQL".
+#   vi-en — Vietnamese that teaches terminology: English gloss in parentheses
+#           on FIRST use of each specialized term (later uses Vietnamese only);
+#           register all glossed terms in glossary.md. Gloss domain terms only,
+#           never everyday words, never proper nouns.
 #           Example: "Co so du lieu (database) luu tru ho so".
 #
 # If this block is empty or missing, ASK the user before running any command.

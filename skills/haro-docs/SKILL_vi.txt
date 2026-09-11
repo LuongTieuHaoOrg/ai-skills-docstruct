@@ -476,9 +476,29 @@ Folder chưa cần dùng có thể giữ nguyên `README.md` và ghi chú ngắn
      | `vi`   | Thuần Việt; chỉ giữ nguyên tiếng Anh cho TÊN RIÊNG / tên sản phẩm / công nghệ không có bản dịch (code, Java, PostgreSQL, REST API...) | "Hệ thống chạy trên PostgreSQL" |
      | `vi-en`| Tiếng Việt kèm chú thích tiếng Anh trong ngoặc ở LẦN DÙNG ĐẦU của mỗi thuật ngữ chuyên ngành; đăng ký các thuật ngữ đó vào `glossary.md` | "Cơ sở dữ liệu (database) lưu trữ hồ sơ" |
 
-     Phân biệt hai chế độ cuối: `vi` giữ từ tiếng Anh vì KHÔNG CÓ từ Việt tương
-     đương; `vi-en` chủ động kèm gốc tiếng Anh để DẠY THUẬT NGỮ, giúp người đọc
-     tra cứu thêm.
+      Phân biệt hai chế độ cuối: `vi` giữ từ tiếng Anh vì KHÔNG CÓ từ Việt tương
+      đương; `vi-en` chủ động kèm gốc tiếng Anh để DẠY THUẬT NGỮ, giúp người đọc
+      tra cứu thêm.
+
+      **`vi` chi tiết — tiếng Việt thuần.** Tiếng Anh chỉ xuất hiện ở chỗ tiếng Việt
+      không có từ: tên riêng, tên sản phẩm/công nghệ, identifier trong code
+      (PostgreSQL, REST API, `userId`...). Không dịch tên riêng ra tiếng Việt, không
+      chú thích Anh trong ngoặc.
+      - Đúng: "Hệ thống chạy trên PostgreSQL và expose REST API."
+      - Sai: "Cơ sở dữ liệu (database) lưu trữ hồ sơ." — chú thích trong ngoặc là việc
+        của `vi-en`; ở `vi` chỉ viết "Cơ sở dữ liệu".
+
+      **`vi-en` chi tiết — tiếng Việt có dạy thuật ngữ.** LẦN ĐẦU gặp mỗi thuật ngữ
+      chuyên ngành/domain thì kèm gốc tiếng Anh trong ngoặc và đăng ký vào `glossary.md`;
+      các lần sau chỉ dùng tiếng Việt.
+      - Lần đầu: "Cơ sở dữ liệu (database) lưu trữ hồ sơ." Lần sau: "Cơ sở dữ liệu
+        được backup hằng ngày."
+      - Chỉ gloss thuật ngữ chuyên ngành/domain (database, deployment, stakeholder...).
+        KHÔNG gloss từ thông thường — "Hệ thống (system) chạy (run)" là nhiễu. KHÔNG
+        gloss tên riêng — giữ trần như `vi`.
+
+      **Chọn khi nào:** độc giả chỉ đọc tiếng Việt → `vi`; độc giả cần tra cứu tài liệu
+      Anh sau này → `vi-en` để tài liệu dạy từ ngay lần đầu.
    - **Fallback:** nếu cấu hình ngôn ngữ trống hoặc thiếu → PHẢI hỏi user quyết
      định trước khi chạy lệnh nào. Tuyệt đối không tự suy đoán mặc định.
 3. **Ghi trạng thái hiện tại, không ghi thay đổi - không giữ backward:** khi tạo
