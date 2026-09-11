@@ -1,23 +1,23 @@
 ================================================================================
-SKILL: DOCSTRUCT — BẢN DỊCH TIẾNG VIỆT (THAM KHẢO CHO NGƯỜI ĐỌC)
+SKILL: HARO-DOCS — BẢN DỊCH TIẾNG VIỆT (THAM KHẢO CHO NGƯỜI ĐỌC)
 File này CHỈ dành cho con người đọc. Agent KHÔNG load file này —
 bản chính thức để agent thực thi là SKILL.md (tiếng Anh).
 ================================================================================
 
 --- FRONTMATTER ---
-name: docstruct
+name: haro-docs
 description: Quản lý và tạo cấu trúc tài liệu dự án theo mô hình Atomic
 Content Blocks. Kích hoạt khi user muốn khởi tạo cấu trúc tài liệu cho dự án mới,
 tổ chức/refactor tài liệu đang tồn tại, tổng hợp tài liệu hoàn chỉnh (BRD, PRD,
 SAD, FSD...), review phản biện một vấn đề/file qua subagent, hoặc quản lý bộ nhớ
-kiến thức project qua remember/knowledge. Gõ /docstruct không tham số để quét
+kiến thức project qua remember/knowledge. Gõ /haro-docs không tham số để quét
 dự án và chọn thao tác tiếp theo.
 
 ================================================================================
 1. TỔNG QUAN
 ================================================================================
 
-`docstruct` tổ chức tài liệu dưới dạng **Atomic Content Blocks (Khối Nội dung
+`haro-docs` tổ chức tài liệu dưới dạng **Atomic Content Blocks (Khối Nội dung
 Nguyên tử)**: mỗi mục nhỏ là một file markdown riêng biệt, viết đúng một lần
 (Single Source of Truth), sau đó lắp ghép thành tài liệu hoàn chỉnh (BRD, PRD,
 SAD, FSD...).
@@ -29,7 +29,7 @@ SAD, FSD...).
 - **Linh hoạt:** tài liệu đầu ra chỉ là các "View" được tổng hợp từ cùng tập block
   gốc theo **Aggregation Matrix** (Mục 7).
 - **Bộ nhớ kiến thức:** fact của project (business, technical, team...) lưu thành
-  file nhỏ theo domain dưới `.docstruct/knowledge/` và load chọn lọc như RAG.
+  file nhỏ theo domain dưới `.haro-docs/knowledge/` và load chọn lọc như RAG.
 
 ================================================================================
 1.1 KNOWLEDGE NHƯ RAG CHỌN LỌC (không cần vector DB)
@@ -40,7 +40,7 @@ Vì không có vector search, knowledge được tổ chức để truy xuất q
 - Mỗi fact lưu trong file đặt tên theo domain: `business-*.md`, `technical-*.md`,
   `team-*.md`, `common-*.md`, `security-*.md`... Agent tự chọn tên phù hợp nhất
   với nội dung để có thể tìm mà không cần load toàn bộ.
-- `.docstruct/knowledge/_index.md` là bảng tra duy nhất: mỗi file một dòng
+- `.haro-docs/knowledge/_index.md` là bảng tra duy nhất: mỗi file một dòng
   `file | domain | summary | tags`. Agent chỉ đọc `_index.md` (nhỏ) để quyết định
   file nào cần load cho task hiện tại, rồi chỉ load những file đó. Không load toàn
   bộ `knowledge/` mặc định.
@@ -49,12 +49,12 @@ Vì không có vector search, knowledge được tổ chức để truy xuất q
   cho SAD), chỉ load file khớp. Knowledge thắng default khi xung đột.
 
 ================================================================================
-2. WORKSPACE `.docstruct/`
+2. WORKSPACE `.haro-docs/`
 ================================================================================
 
-Skill lưu toàn bộ cấu hình và trạng thái vào `.docstruct/` tại gốc dự án:
+Skill lưu toàn bộ cấu hình và trạng thái vào `.haro-docs/` tại gốc dự án:
 
-.docstruct/
+.haro-docs/
 ├── project-profile.yaml   # Hồ sơ dự án: loại, audience, doc-root, cấu hình ngôn ngữ, schema_version
 ├── schema.yaml            # Cây thư mục đã duyệt + ma trận tổng hợp (+ schema_version)
 ├── agents.yaml            # Cấu hình subagent review ("đệ tử") — xem Mục 10
@@ -79,30 +79,30 @@ Skill lưu toàn bộ cấu hình và trạng thái vào `.docstruct/` tại g�
 > Nếu trống hoặc thiếu, phải hỏi user trước khi chạy lệnh nào.
 
 > BỘ NHỚ RAG: Trước mọi lượt `init`, `generate` cần context,
-> đọc `.docstruct/knowledge/_index.md` (nếu tồn tại), rồi chỉ load file knowledge
+> đọc `.haro-docs/knowledge/_index.md` (nếu tồn tại), rồi chỉ load file knowledge
 > có domain/tags khớp task. Dùng knowledge làm ground truth khi xung đột. Xem Mục 4.
 
-> ELICITATION & STATUS: `generate` lưu Q&A tạm tại `.docstruct/elicitation/` và
+> ELICITATION & STATUS: `generate` lưu Q&A tạm tại `.haro-docs/elicitation/` và
 > đánh trạng thái mỗi file `DRAFT | UPDATING | RELEASED` (frontmatter `status:` +
-> `.docstruct/status/`). Xem Mục 6.
+> `.haro-docs/status/`). Xem Mục 6.
 
 ================================================================================
-3. LỆNH `/docstruct` (không tham số) - QUÉT DỰ ÁN + DASHBOARD + CHỌN THAO TÁC
+3. LỆNH `/haro-docs` (không tham số) - QUÉT DỰ ÁN + DASHBOARD + CHỌN THAO TÁC
 ================================================================================
 
-Khi user chạy `/docstruct` không tham số, hoặc tham số không khớp lệnh nào, KHÔNG
+Khi user chạy `/haro-docs` không tham số, hoặc tham số không khớp lệnh nào, KHÔNG
 thực thi workflow. Thay vào đó chạy **quét sâu chỉ-đọc** rồi hiện dashboard + popup
 chọn thao tác:
 
 1. **Quét sâu (read-only)** -
-   - Nếu `.docstruct/project-profile.yaml` và `schema.yaml` tồn tại: đọc `docroot`,
+   - Nếu `.haro-docs/project-profile.yaml` và `schema.yaml` tồn tại: đọc `docroot`,
      `language.*`, `schema_version`; liệt kê cây thực tế dưới doc-root (mỗi folder
      00-common -> 99-assets: tồn tại/thiếu, số file, breakdown DRAFT/UPDATING/RELEASED
-     từ frontmatter `status:` + `.docstruct/status/`).
+     từ frontmatter `status:` + `.haro-docs/status/`).
    - Nếu chưa init: hiện `Not initialized` và preview cây chuẩn từ Mục 8.
-   - Kiểm tra knowledge: nếu `.docstruct/knowledge/_index.md` tồn tại, hiện
+   - Kiểm tra knowledge: nếu `.haro-docs/knowledge/_index.md` tồn tại, hiện
      `Knowledge: N files` và 5 dòng đầu; nếu không, hiện `Knowledge: (empty)`.
-   - Kiểm tra agents: nếu `.docstruct/agents.yaml` tồn tại, hiện
+   - Kiểm tra agents: nếu `.haro-docs/agents.yaml` tồn tại, hiện
      `Agents: <ids> (default: <id>)`; nếu không, hiện `Agents: (default inline critic)`.
    - Quét nhẹ repo: README (domain, tính năng chính), cây source top-level + tín hiệu
      tech stack (package.json / requirements / go.mod / pom.xml / Cargo.toml...),
@@ -113,13 +113,13 @@ chọn thao tác:
 
     | Lệnh | Khi nào dùng | Ví dụ |
     |------|-------------|-------|
-    | `/docstruct init <mô tả>` | Khởi tạo cấu trúc 12 folder, hoặc re-init / migrate nếu đã init | `/docstruct init E-commerce Next.js + PostgreSQL` |
-    | `/docstruct generate` | Xây file tiếp theo theo thứ tự (hỏi theo role) | `/docstruct generate` |
-    | `/docstruct generate <file>` | Tập trung vào file chỉ định | `/docstruct generate 02-business/01-value-prop.md` |
-    | `/docstruct review <chủ đề\|file>` | Review phản biện vấn đề/file qua subagent | `/docstruct review Có nên dùng microservices?` |
-    | `/docstruct remember <text tự do>` | Ghi kiến thức (phân tích -> confirm -> lưu) | `/docstruct remember STID là công ty` |
-    | `/docstruct knowledge` | Liệt kê knowledge | `/docstruct knowledge` |
-    | `/docstruct config [agents\|conventions\|language]` | Hub cấu hình: subagent review, quy ước, ngôn ngữ | `/docstruct config` |
+    | `/haro-docs init <mô tả>` | Khởi tạo cấu trúc 12 folder, hoặc re-init / migrate nếu đã init | `/haro-docs init E-commerce Next.js + PostgreSQL` |
+    | `/haro-docs generate` | Xây file tiếp theo theo thứ tự (hỏi theo role) | `/haro-docs generate` |
+    | `/haro-docs generate <file>` | Tập trung vào file chỉ định | `/haro-docs generate 02-business/01-value-prop.md` |
+    | `/haro-docs review <chủ đề\|file>` | Review phản biện vấn đề/file qua subagent | `/haro-docs review Có nên dùng microservices?` |
+    | `/haro-docs remember <text tự do>` | Ghi kiến thức (phân tích -> confirm -> lưu) | `/haro-docs remember STID là công ty` |
+    | `/haro-docs knowledge` | Liệt kê knowledge | `/haro-docs knowledge` |
+    | `/haro-docs config [agents\|conventions\|language]` | Hub cấu hình: subagent review, quy ước, ngôn ngữ | `/haro-docs config` |
 
 3. **Hiện Aggregation Matrix rút gọn** - BRD/PRD/SAD/FSD từ Mục 7.
 4. **Popup chọn thao tác** — sau dashboard luôn hỏi user làm gì tiếp (dùng question/picker
@@ -130,13 +130,13 @@ chọn thao tác:
    - Knowledge trống → gợi ý `remember <facts>`.
    User được chọn gợi ý hoặc gọi lệnh khác. KHÔNG tự chạy side-effect khi chưa qua
    confirm của lệnh đó.
-5. **Không tạo/sửa file.** Nếu token đầu không khớp (vd `/docstruct foo`), prefix
+5. **Không tạo/sửa file.** Nếu token đầu không khớp (vd `/haro-docs foo`), prefix
    `Unknown command 'foo'. Valid: init, generate, review, remember, knowledge, config.`
    và gợi ý gần đúng. Alias `help`, `--help`, `-h` cũng hiện dashboard. So khớp
    case-insensitive.
 
 ================================================================================
-4. LỆNH `/docstruct remember / knowledge` - BỘ NHỚ KIẾN THỨC (RAG CHỌN LỌC)
+4. LỆNH `/haro-docs remember / knowledge` - BỘ NHỚ KIẾN THỨC (RAG CHỌN LỌC)
 ================================================================================
 
 File kiến thức là fact chuẩn mà agent phải nhớ và tuân theo. Lưu thành file nhỏ
@@ -144,7 +144,7 @@ theo domain để load chọn lọc mà không cần đọc toàn bộ.
 
 ### Lưu trữ
 
-.docstruct/knowledge/
+.haro-docs/knowledge/
 ├── _index.md          # file | domain | summary | tags - chỉ file này đọc mặc định
 ├── business-*.md
 ├── technical-*.md
@@ -189,12 +189,12 @@ Unknown subcommand cho nhóm này -> `Unknown command 'X'. Valid: remember <text
 ### Ví dụ
 
 ```
-/docstruct remember STID là công ty tôi, tôi là PM, member gồm Hảo (tôi), Vu (Backend) và Dai (Frontend)
-/docstruct knowledge
+/haro-docs remember STID là công ty tôi, tôi là PM, member gồm Hảo (tôi), Vu (Backend) và Dai (Frontend)
+/haro-docs knowledge
 ```
 
 ================================================================================
-5. LỆNH `/docstruct init <mô tả dự án>`
+5. LỆNH `/haro-docs init <mô tả dự án>`
 ================================================================================
 
 Khởi tạo cấu trúc tài liệu cho một dự án. Xử lý cả init mới và re-init khi đã init rồi.
@@ -202,11 +202,11 @@ Khởi tạo cấu trúc tài liệu cho một dự án. Xử lý cả init mớ
 ### 5.1 PHÁT HIỆN TRẠNG THÁI HIỆN TẠI
 
 1. **Quét trước** — quét sâu như Mục 3: README, cây source + tech stack, docs hiện có
-   (trong và ngoài doc-root), trạng thái `.docstruct/` (project-profile.yaml,
+   (trong và ngoài doc-root), trạng thái `.haro-docs/` (project-profile.yaml,
    schema.yaml, `schema_version`, số file knowledge, config agents).
-2. **Nếu `.docstruct/` đã tồn tại** (re-init) — hiện cái đang có (profile,
+2. **Nếu `.haro-docs/` đã tồn tại** (re-init) — hiện cái đang có (profile,
    schema_version, doc-root, số file docs, knowledge N files) và hỏi:
-   - `[1] Override — xây lại từ đầu` (`.docstruct` + cây docs mới từ templates)
+   - `[1] Override — xây lại từ đầu` (`.haro-docs` + cây docs mới từ templates)
    - `[2] Migrate / Upgrade — cập nhật tại chỗ, giữ nội dung` (khuyên dùng khi
      docs/knowledge đã có giá trị)
    - `[3] Hủy`
@@ -229,7 +229,7 @@ Khởi tạo cấu trúc tài liệu cho một dự án. Xử lý cả init mớ
        `vi-en` (định nghĩa tại Mục 10)
 3. **Hỏi vị trí lưu tài liệu (doc-root)** — user chọn:
    - `docs/` (thư mục tài liệu truyền thống), hoặc
-   - `.docstruct/docs/` (gói gọn trong workspace của skill)
+   - `.haro-docs/docs/` (gói gọn trong workspace của skill)
 3b. **Chốt quy ước (gọn 4-6 câu)** — Phần A (cố định do skill áp: naming file, SSOT,
    vòng đời status, ngôn ngữ, images, quy tắc file auto) được seed từ
    `templates/conventions.md`, không hỏi; chỉ hiện preview read-only. Chỉ hỏi Phần B
@@ -248,10 +248,10 @@ Khởi tạo cấu trúc tài liệu cho một dự án. Xử lý cả init mớ
    phương án sắp xếp lại (bảng mapping `old path → new path | giữ / di chuyển / archive
    vào 99-assets/_legacy/`) trong bước này.
 5. **Khởi tạo** — sau khi duyệt:
-   - Tạo `.docstruct/project-profile.yaml` và `.docstruct/schema.yaml`
+   - Tạo `.haro-docs/project-profile.yaml` và `.haro-docs/schema.yaml`
      (từ template trong thư mục `templates/` của skill) với `schema_version: 1`,
      bao gồm cả `language.response` và `language.documentation` đã chọn
-   - Tạo `.docstruct/agents.yaml` từ `templates/agents.yaml` nếu chưa có (không bao
+   - Tạo `.haro-docs/agents.yaml` từ `templates/agents.yaml` nếu chưa có (không bao
      giờ ghi đè file đã tồn tại khi chưa hỏi)
    - Ghi `00-common/01-conventions.md` từ `templates/conventions.md` với giá trị Phần B
      từ bước 3b; tạo `02-references.md`, `03-abbreviations.md`, `04-glossary.md`,
@@ -261,8 +261,8 @@ Khởi tạo cấu trúc tài liệu cho một dự án. Xử lý cả init mớ
 
 ### 5.3 RE-INIT: OVERRIDE vs MIGRATE
 
-**Backup trước (bắt buộc cả 2 nhánh):** trước khi đụng vào gì, copy `.docstruct/` +
-cây doc-root sang `.docstruct.backup-<YYYYMMDD-HHmmss>/` và báo đường dẫn backup
+**Backup trước (bắt buộc cả 2 nhánh):** trước khi đụng vào gì, copy `.haro-docs/` +
+cây doc-root sang `.haro-docs.backup-<YYYYMMDD-HHmmss>/` và báo đường dẫn backup
 trong reply. Backup lỗi thì dừng và hỏi user.
 
 | | Override (xây lại) | Migrate / Upgrade (tại chỗ) |
@@ -290,21 +290,21 @@ Dùng question/picker nếu có, không thì list đánh số. Chờ user chọn
 `generate` khi chưa confirm.
 
 VÍ DỤ:
-/docstruct init Dự án e-commerce bằng Next.js + PostgreSQL, đội 3 dev
-/docstruct init
+/haro-docs init Dự án e-commerce bằng Next.js + PostgreSQL, đội 3 dev
+/haro-docs init
 
 Không có mô tả: vẫn quét dự án hiện tại trước, rồi hỏi từ bước 2.
 
 ================================================================================
-6. LỆNH `/docstruct generate` / `generate <file>` - XÂY DOCS THEO THỨ TỰ (HỎI THEO ROLE)
+6. LỆNH `/haro-docs generate` / `generate <file>` - XÂY DOCS THEO THỨ TỰ (HỎI THEO ROLE)
 ================================================================================
 
 Xây tài liệu linh hoạt dựa trên thực trạng + vai trò bạn. Hai chế độ:
 
-- `/docstruct generate` — đề xuất 2-3 file tiếp theo để xây, dựa trên thực trạng, không cứng nhắc.
+- `/haro-docs generate` — đề xuất 2-3 file tiếp theo để xây, dựa trên thực trạng, không cứng nhắc.
   Bỏ qua toàn bộ `00-common` — `01-conventions.md` đã chốt lúc `init` (bước 3b),
   `02-05` auto-populate; điểm bắt đầu viết là `01-overview`.
-- `/docstruct generate <file>` — tập trung vào file chỉ định (vd `02-business/01-value-prop.md`
+- `/haro-docs generate <file>` — tập trung vào file chỉ định (vd `02-business/01-value-prop.md`
   hoặc `10-deliverables/01-BRD.md`) để tạo hoặc điều chỉnh. Nếu file đã `RELEASED`,
   cảnh báo và hỏi có update không.
 
@@ -319,13 +319,13 @@ không chặn linh hoạt. Nếu tất cả đã `RELEASED`, trả `Tất cả �
 
 ### Lưu elicitation
 
-Q&A tạm lưu tại `.docstruct/elicitation/<sanitized-path>.md` (vd
+Q&A tạm lưu tại `.haro-docs/elicitation/<sanitized-path>.md` (vd
 `02-business-01-value-prop.md`) để đỡ context. Chỉ đọc khi cần trong `generate`.
 Sau khi xong file chính, hỏi user giữ hay xóa file elicitation.
 
 ### Trạng thái
 
-Mỗi file docs có `status:` ở frontmatter và mirror tại `.docstruct/status/<path>`:
+Mỗi file docs có `status:` ở frontmatter và mirror tại `.haro-docs/status/<path>`:
 
 - `DRAFT` — file mới hoàn toàn, version đầu tiên.
 - `UPDATING` — đã có nội dung tham khảo và đang chỉnh sửa.
@@ -389,16 +389,16 @@ Không giữ backward: mọi tạo mới/điều chỉnh đều coi như version
 7. **Dọn elicitation** — hỏi `Giữ file elicitation để tra cứu hay xóa? (keep / delete)`.
 8. **Confirm & đánh trạng thái** — hỏi `Đánh trạng thái file là? (DRAFT / UPDATING / RELEASED)`.
    Mặc định `RELEASED` nếu user nói đã xong. Cập nhật frontmatter và
-   `.docstruct/status/<path>`. `RELEASED` mới được tham chiếu bởi `generate` sau.
+   `.haro-docs/status/<path>`. `RELEASED` mới được tham chiếu bởi `generate` sau.
 9. **Popup lệnh tiếp theo** — sau khi đánh trạng thái luôn hỏi làm gì tiếp (picker nếu
    có, không thì list đánh số). Đề xuất 2-3 ứng viên cụ thể theo thực trạng mới (tiền đề
    + gap), mỗi cái kèm lý do 1 dòng, cộng thêm `review <file vừa xong>` và `dừng`. Chờ
    user chọn; KHÔNG tự chạy.
 
 VÍ DỤ:
-/docstruct generate
-/docstruct generate 02-business/01-value-prop.md
-/docstruct generate 10-deliverables/01-BRD.md
+/haro-docs generate
+/haro-docs generate 02-business/01-value-prop.md
+/haro-docs generate 10-deliverables/01-BRD.md
 
 ================================================================================
 7. AGGREGATION MATRIX — MA TRẬN TỔNG HỢP
@@ -422,7 +422,7 @@ VÍ DỤ:
 
 Cấu trúc duy nhất cho mọi dự án:
 
-docs/                        # hoặc .docstruct/docs/ tùy doc-root user chọn
+docs/                        # hoặc .haro-docs/docs/ tùy doc-root user chọn
 ├── 00-common/               # 01-conventions.md, 02-references.md, 03-abbreviations.md, 04-glossary.md, 05-traceability.md (01 manual, 02-05 auto)
 ├── 01-overview/             # 01-problem-statement.md, 02-vision.md, 03-goals.md, 04-scope.md, 05-stakeholders.md, 06-constraints.md, 07-roadmap.md (Version|Goal|Target|Status)
 ├── 02-business/             # 01-value-proposition.md, 02-market-analysis.md, 03-business-model.md, 04-pricing.md, 05-sla.md, 06-risk-legal.md, use-cases/, change-requests/CR-*.md
@@ -500,24 +500,24 @@ Folder chưa cần dùng có thể giữ nguyên `README.md` và ghi chú ngắn
 6. **Hình ảnh/sơ đồ:** lưu tại `99-assets/`, tham chiếu bằng đường dẫn tương đối;
    không nhúng base64 inline.
 7. **Vòng đời block:** mỗi block có trạng thái `draft → review → approved`, quản
-   lý tại `.docstruct/status/`; chỉ block `approved` được đem vào tài liệu tổng
+   lý tại `.haro-docs/status/`; chỉ block `approved` được đem vào tài liệu tổng
    hợp mà không cần xem lại.
 8. **README con:** mọi thư mục phải có `README.md` mô tả phạm vi và danh sách file.
 
 ================================================================================
-10. LỆNH `/docstruct review <chủ đề|file>` - REVIEW PHẢN BIỆN QUA SUBAGENT
+10. LỆNH `/haro-docs review <chủ đề|file>` - REVIEW PHẢN BIỆN QUA SUBAGENT
 ================================================================================
 
 Nghiên cứu, phân tích và đánh giá khách quan một vấn đề, ý tưởng hoặc file docs
 bằng tư duy phản biện và logic. Skill điều phối subagent review ("đệ tử"), rồi tổng
 hợp các báo cáo thành một verdict + đề xuất tiếp theo. **Chỉ-đọc với docs**: không
-bao giờ sửa file được review; chỉ lưu báo cáo vào `.docstruct/reviews/` khi đã hỏi.
+bao giờ sửa file được review; chỉ lưu báo cáo vào `.haro-docs/reviews/` khi đã hỏi.
 
 CÚ PHÁP:
 
-/docstruct review Có nên dùng microservices cho dự án này?
-/docstruct review 04-architecture/02-components.md
-/docstruct review --no-agents Mô hình pricing hiện tại có lỗ hổng
+/haro-docs review Có nên dùng microservices cho dự án này?
+/haro-docs review 04-architecture/02-components.md
+/haro-docs review --no-agents Mô hình pricing hiện tại có lỗ hổng
 
 QUY TRÌNH:
 
@@ -525,7 +525,7 @@ QUY TRÌNH:
    chỉ load dòng có domain/tags khớp chủ đề. Nếu đích là đường dẫn docs: đọc file đó +
    file lân cận cùng folder + glossary. Nếu là text tự do: quét nhẹ repo + doc-root tìm
    bằng chứng liên quan. Nêu rõ `sources: ...` để reviewer trích dẫn được.
-2. **Chốt reviewer từ `.docstruct/agents.yaml`:**
+2. **Chốt reviewer từ `.haro-docs/agents.yaml`:**
    - Thiếu file: dùng 1 `critic` inline với prompt mặc định từ `templates/agents.yaml`
      (chế độ single-critic).
    - Có file: hiện agents đang enabled (`id | role`), cho user multi-select (picker nếu
@@ -550,8 +550,8 @@ QUY TRÌNH:
    - `Overall verdict:` agree | conditionally-agree | disagree + rationale 3-5 dòng
    - `Risks & alternatives:` list ngắn
    Trả lời bằng `language.response`. Khách quan: báo cáo trung thực bất đồng, không giấu.
-5. **Lưu báo cáo (phải hỏi trước)** — hỏi `Lưu báo cáo review vào .docstruct/reviews/?
-   (save / skip)`. Nếu `save`, ghi `.docstruct/reviews/RR-YYYYMMDD-HHmmss-<slug>.md` với
+5. **Lưu báo cáo (phải hỏi trước)** — hỏi `Lưu báo cáo review vào .haro-docs/reviews/?
+   (save / skip)`. Nếu `save`, ghi `.haro-docs/reviews/RR-YYYYMMDD-HHmmss-<slug>.md` với
    frontmatter (`topic, verdict, reviewers, date, sources`) + synthesis + tóm tắt từng
    reviewer. Không lưu khi chưa hỏi.
 6. **Popup tiếp theo** — sau synthesis luôn đề xuất follow-up (picker nếu có): vd
@@ -560,12 +560,12 @@ QUY TRÌNH:
 
 VÍ DỤ:
 
-/docstruct review Có nên dùng microservices cho dự án này?
-/docstruct review 05-security/01-threat-model.md
-/docstruct review --no-agents SLA hiện tại có thực tế không?
+/haro-docs review Có nên dùng microservices cho dự án này?
+/haro-docs review 05-security/01-threat-model.md
+/haro-docs review --no-agents SLA hiện tại có thực tế không?
 
 ================================================================================
-11. LỆNH `/docstruct config` - HUB CẤU HÌNH (agents | conventions | language)
+11. LỆNH `/haro-docs config` - HUB CẤU HÌNH (agents | conventions | language)
 ================================================================================
 
 Hub tập trung cho cấu hình skill. Ba nhánh, không có `doc-root` ở đây (đổi doc-root
@@ -573,10 +573,10 @@ là migrate nặng — giữ trong `init`).
 
 ### 11.1 HUB (không tham số)
 
-/docstruct config               → picker hub (chỉ-đọc cho đến khi chọn nhánh)
-/docstruct config agents        → vào thẳng §11.2
-/docstruct config conventions   → vào thẳng §11.3
-/docstruct config language      → vào thẳng §11.4
+/haro-docs config               → picker hub (chỉ-đọc cho đến khi chọn nhánh)
+/haro-docs config agents        → vào thẳng §11.2
+/haro-docs config conventions   → vào thẳng §11.3
+/haro-docs config language      → vào thẳng §11.4
 
 QUY TRÌNH:
 
@@ -592,13 +592,13 @@ QUY TRÌNH:
 
 ### 11.2 NHÁNH: agents - QUẢN LÝ SUBAGENT REVIEW
 
-Quản lý cấu hình `.docstruct/agents.yaml`:
+Quản lý cấu hình `.haro-docs/agents.yaml`:
 
 1. Thiếu file thì tạo từ `templates/agents.yaml` của skill rồi hiện nội dung.
 2. Có file thì liệt kê `id | role | enabled | default?`.
 3. Cho chọn thao tác (picker nếu có, không thì list số): `thêm agent | sửa role/prompt |
    bật / tắt | đặt default_reviewer | reset từ template (hỏi trước khi ghi đè prompt custom)`.
-4. Sau đổi, render lại list và nhắc `/docstruct review` sẽ offer các agents này để chọn.
+4. Sau đổi, render lại list và nhắc `/haro-docs review` sẽ offer các agents này để chọn.
    `init` không bao giờ ghi đè `agents.yaml` đã có khi chưa hỏi (chỉ merge key thiếu) —
    xem Mục 5.3.
 
@@ -619,7 +619,7 @@ Sửa Phần B của `00-common/01-conventions.md` (Phần A do skill cố đị
 
 ### 11.4 NHÁNH: language - NGÔN NGỮ TRẢ LỜI + TÀI LIỆU
 
-1. Hiện `language.response` + `language.documentation` từ `.docstruct/project-profile.yaml`
+1. Hiện `language.response` + `language.documentation` từ `.haro-docs/project-profile.yaml`
    (kèm định nghĩa `vi` vs `vi-en` ở Mục 9).
 2. Cho đổi với option `en | vi | vi-en` tùy mục; confirm trước khi ghi vào `project-profile.yaml`.
 

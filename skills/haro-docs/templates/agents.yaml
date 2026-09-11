@@ -1,12 +1,12 @@
-# .docstruct/agents.yaml
-# Review subagent configuration ("đệ tử" hỗ trợ) — managed by /docstruct init and /docstruct config agents.
+# .haro-docs/agents.yaml
+# Review subagent configuration ("đệ tử" hỗ trợ) — managed by /haro-docs init and /haro-docs config agents.
 # Each entry defines a reviewer persona the skill can dispatch via subagent (Task tool)
 # or run inline as fallback when subagents are unavailable.
 # version: schema_version of this file, starts at 1.
 
 version: 1
 
-# Pre-selected agent(s) for /docstruct review when the user does not pick explicitly.
+# Pre-selected agent(s) for /haro-docs review when the user does not pick explicitly.
 default_reviewer: critic
 
 agents:
@@ -27,7 +27,7 @@ agents:
     role: "Evidence researcher — collects facts from repo, docs and knowledge"
     prompt: >-
       You are an evidence researcher. Search the repository, the documentation
-      tree (doc-root) and .docstruct/knowledge/ for facts relevant to the given
+      tree (doc-root) and .haro-docs/knowledge/ for facts relevant to the given
       problem. Return findings as bullet list with source references
       (file:line). Do NOT judge or conclude — only collect verifiable facts
       and mark what is missing.

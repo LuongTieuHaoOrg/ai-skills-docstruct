@@ -1,35 +1,35 @@
 ---
-name: docstruct
-description: Manage project documentation structure using the Atomic Content Blocks model. Use when the user wants to initialize a documentation structure for a new project, organize/refactor existing documentation, aggregate complete documents (BRD, PRD, SAD, FSD...) from existing content blocks, critically review a problem/file via subagent reviewers, or manage project knowledge memory via remember/knowledge. Run /docstruct with no args to scan the project and pick the next action.
+name: haro-docs
+description: Manage project documentation structure using the Atomic Content Blocks model. Use when the user wants to initialize a documentation structure for a new project, organize/refactor existing documentation, aggregate complete documents (BRD, PRD, SAD, FSD...) from existing content blocks, critically review a problem/file via subagent reviewers, or manage project knowledge memory via remember/knowledge. Run /haro-docs with no args to scan the project and pick the next action.
 ---
 
-# Docstruct — Documentation Structure Skill
+# Haro Docs — Documentation Structure Skill
 
 ## 1. Overview
 
-`docstruct` organizes project documentation as **Atomic Content Blocks**: every small section of documentation is a separate markdown file, written exactly once (Single Source of Truth), then flexibly assembled into complete documents (BRD, PRD, SAD, FSD...).
+`haro-docs` organizes project documentation as **Atomic Content Blocks**: every small section of documentation is a separate markdown file, written exactly once (Single Source of Truth), then flexibly assembled into complete documents (BRD, PRD, SAD, FSD...).
 
 Key strengths:
 
 - **Standardization:** every project has an identical documentation structure, making quality comparable.
 - **Atomicity:** each block is an independent object — easy to assign, track status, and version.
 - **Flexibility:** output documents are just different "Views" aggregated from the same source blocks via the **Aggregation Matrix** (Section 7).
-- **Knowledge memory:** project facts (business, technical, team, conventions) are stored as small domain-scoped files under `.docstruct/knowledge/` and selectively loaded like RAG — no vector DB needed.
+- **Knowledge memory:** project facts (business, technical, team, conventions) are stored as small domain-scoped files under `.haro-docs/knowledge/` and selectively loaded like RAG — no vector DB needed.
 
 ## 1.1 Knowledge as Selective RAG (no vector DB)
 
 Because vector search is not available, knowledge is organized for **filename + index** retrieval:
 
 - Each fact is stored in a file named by domain: `business-*.md`, `technical-*.md`, `team-*.md`, `common-*.md`, `security-*.md`, etc. The agent chooses the name that best matches the content so it can be found without loading all memory.
-- `.docstruct/knowledge/_index.md` is the single lookup table: for each file, one row with `file | domain | one-line summary | tags`. Agents read **only `_index.md`** (small) to decide which files to load for the current task, then load only those files. Never load the entire `knowledge/` directory by default.
+- `.haro-docs/knowledge/_index.md` is the single lookup table: for each file, one row with `file | domain | one-line summary | tags`. Agents read **only `_index.md`** (small) to decide which files to load for the current task, then load only those files. Never load the entire `knowledge/` directory by default.
 - Use `_index.md` before every `init` or `generate` turn that needs project context: read `_index.md`, pick rows whose domain/tags match the task (e.g. business for BRD, technical/architecture for SAD), load only those files. Knowledge overrides scanned defaults when they conflict.
 
-## 2. Workspace `.docstruct/`
+## 2. Workspace `.haro-docs/`
 
-The skill stores all configuration and state in `.docstruct/` at the project root:
+The skill stores all configuration and state in `.haro-docs/` at the project root:
 
 ```
-.docstruct/
+.haro-docs/
 ├── project-profile.yaml   # Project profile: type, audience, doc-root, language settings, schema_version
 ├── schema.yaml            # Approved folder tree + aggregation matrix (+ schema_version)
 ├── agents.yaml            # Review subagent ("đệ tử") configuration — see Section 10
@@ -47,34 +47,34 @@ The skill stores all configuration and state in `.docstruct/` at the project roo
 
 > **Important:** `project-profile.yaml` records the **doc-root** — the documentation location chosen by the user during `init`. Every command (`generate`, `remember`, `knowledge`) must read this config before operating. Never guess the doc-root.
 
-> **Knowledge RAG:** Before any `init` or `generate` turn that needs project context, read `.docstruct/knowledge/_index.md` (if it exists), then selectively load only the knowledge files whose domain/tags match the task. Use knowledge as ground truth when it conflicts with scanned defaults. See Section 4.
+> **Knowledge RAG:** Before any `init` or `generate` turn that needs project context, read `.haro-docs/knowledge/_index.md` (if it exists), then selectively load only the knowledge files whose domain/tags match the task. Use knowledge as ground truth when it conflicts with scanned defaults. See Section 4.
 
-> **Elicitation & Status:** `generate` stores interim Q&A in `.docstruct/elicitation/` and marks each doc file `DRAFT | UPDATING | RELEASED` (frontmatter `status:` + `.docstruct/status/`). See Section 6.
+> **Elicitation & Status:** `generate` stores interim Q&A in `.haro-docs/elicitation/` and marks each doc file `DRAFT | UPDATING | RELEASED` (frontmatter `status:` + `.haro-docs/status/`). See Section 6.
 
 > **Language settings:** `project-profile.yaml` also records the **reply language** (`language.response`) and the **documentation language** (`language.documentation`). These are the single source of truth for all communication and content decisions — see Section 9. If they are empty or missing, ask the user before running any command.
 
-## 3. Command `/docstruct` (no args) — Project Scan + Status Dashboard + Action Picker
+## 3. Command `/haro-docs` (no args) — Project Scan + Status Dashboard + Action Picker
 
-When the user runs `/docstruct` with no arguments, or with arguments that do not match any configured command, do NOT execute a workflow. Instead run a **deep read-only scan** and show the dashboard + action picker:
+When the user runs `/haro-docs` with no arguments, or with arguments that do not match any configured command, do NOT execute a workflow. Instead run a **deep read-only scan** and show the dashboard + action picker:
 
 1. **Deep scan (read-only)** —
-   - If `.docstruct/project-profile.yaml` and `.docstruct/schema.yaml` exist: read `docroot`, `language.*`, `schema_version`; list the actual folder tree under doc-root (for each of `00-common` → `99-assets` show exists/missing, file count, and DRAFT/UPDATING/RELEASED breakdown from frontmatter `status:` + `.docstruct/status/`).
+   - If `.haro-docs/project-profile.yaml` and `.haro-docs/schema.yaml` exist: read `docroot`, `language.*`, `schema_version`; list the actual folder tree under doc-root (for each of `00-common` → `99-assets` show exists/missing, file count, and DRAFT/UPDATING/RELEASED breakdown from frontmatter `status:` + `.haro-docs/status/`).
    - If not initialized: show `Not initialized` and display the standard tree from Section 8 as preview.
-   - Check knowledge: if `.docstruct/knowledge/_index.md` exists, show `Knowledge: N files` and the first 5 index rows; otherwise show `Knowledge: (empty)`.
-   - Check agents config: if `.docstruct/agents.yaml` exists, show `Agents: <ids> (default: <id>)`; otherwise show `Agents: (default inline critic)`.
+   - Check knowledge: if `.haro-docs/knowledge/_index.md` exists, show `Knowledge: N files` and the first 5 index rows; otherwise show `Knowledge: (empty)`.
+   - Check agents config: if `.haro-docs/agents.yaml` exists, show `Agents: <ids> (default: <id>)`; otherwise show `Agents: (default inline critic)`.
    - Scan the repo lightly: README (business domain, key features), top-level source tree + tech stack signals (package.json / requirements / go.mod / pom.xml / Cargo.toml...), code scale estimate, docs files lying outside doc-root (if any).
    - Synthesize a **Project Note**: 5–8 lines on current state — initialized?, doc-root, docs coverage (% RELEASED), biggest gaps (top-3 empty folders/files), tech stack, knowledge depth.
 2. **Show command summary:**
 
    | Command | When to use | Example |
    |---------|-------------|---------|
-   | `/docstruct init <description>` | Initialize structure (12 folders), or re-init / migrate if already initialized | `/docstruct init E-commerce Next.js + PostgreSQL` |
-   | `/docstruct generate` | Build next doc in order (role-adaptive Q&A) | `/docstruct generate` |
-   | `/docstruct generate <file>` | Focus on a specific file | `/docstruct generate 02-business/01-value-prop.md` |
-   | `/docstruct review <topic\|file>` | Critically review a problem/file via subagent reviewer(s) | `/docstruct review Should we use microservices?` |
-   | `/docstruct remember <free text>` | Record knowledge (analyze → confirm → save) | `/docstruct remember STID is my company` |
-   | `/docstruct knowledge` | List all knowledge files | `/docstruct knowledge` |
-   | `/docstruct config [agents\|conventions\|language]` | Manage skill config via hub picker (subagents, conventions, language) | `/docstruct config` |
+   | `/haro-docs init <description>` | Initialize structure (12 folders), or re-init / migrate if already initialized | `/haro-docs init E-commerce Next.js + PostgreSQL` |
+   | `/haro-docs generate` | Build next doc in order (role-adaptive Q&A) | `/haro-docs generate` |
+   | `/haro-docs generate <file>` | Focus on a specific file | `/haro-docs generate 02-business/01-value-prop.md` |
+   | `/haro-docs review <topic\|file>` | Critically review a problem/file via subagent reviewer(s) | `/haro-docs review Should we use microservices?` |
+   | `/haro-docs remember <free text>` | Record knowledge (analyze → confirm → save) | `/haro-docs remember STID is my company` |
+   | `/haro-docs knowledge` | List all knowledge files | `/haro-docs knowledge` |
+   | `/haro-docs config [agents\|conventions\|language]` | Manage skill config via hub picker (subagents, conventions, language) | `/haro-docs config` |
 
 3. **Show Aggregation Matrix (compact)** — BRD/PRD/SAD/FSD source folders from Section 7.
 4. **Action picker (popup)** — after the dashboard, always ask the user what to do next (use the agent's question/picker tool when available, otherwise a numbered list). Pre-suggest **2–3 smart recommendations** based on the scan, e.g.:
@@ -83,16 +83,16 @@ When the user runs `/docstruct` with no arguments, or with arguments that do not
    - Many files `RELEASED` but no recent review → recommend `review <topic>`.
    - Knowledge empty → recommend `remember <seed facts>`.
    The user may pick a suggestion or name any other command. Do NOT auto-run the picked command's side effects without the normal confirmations of that command.
-5. **Do not create or modify any file.** If the first token is unknown (e.g. `/docstruct foo`), prefix the dashboard with `Unknown command 'foo'. Valid: init, generate, review, remember, knowledge, config.` and suggest the closest match. Also handle `help`, `--help`, `-h` as aliases for this dashboard. Matching is case-insensitive, trim whitespace.
+5. **Do not create or modify any file.** If the first token is unknown (e.g. `/haro-docs foo`), prefix the dashboard with `Unknown command 'foo'. Valid: init, generate, review, remember, knowledge, config.` and suggest the closest match. Also handle `help`, `--help`, `-h` as aliases for this dashboard. Matching is case-insensitive, trim whitespace.
 
-## 4. Command `/docstruct remember / knowledge` — Project Knowledge Memory (Selective RAG)
+## 4. Command `/haro-docs remember / knowledge` — Project Knowledge Memory (Selective RAG)
 
 Knowledge files are project facts the agent must remember and follow. They are stored as small domain-scoped files so they can be loaded selectively without reading all memory.
 
 ### Storage
 
 ```
-.docstruct/knowledge/
+.haro-docs/knowledge/
 ├── _index.md          # file | domain | summary | tags — the only file read by default
 ├── business-*.md
 ├── technical-*.md
@@ -132,19 +132,19 @@ Unknown subcommand for this group → `Unknown command 'X'. Valid: remember <fre
 ### Examples
 
 ```
-/docstruct remember STID is my company, I am PM, members are Hao (me), Vu (Backend) and Dai (Frontend)
-/docstruct knowledge
+/haro-docs remember STID is my company, I am PM, members are Hao (me), Vu (Backend) and Dai (Frontend)
+/haro-docs knowledge
 ```
 
-## 5. Command `/docstruct init <project description>`
+## 5. Command `/haro-docs init <project description>`
 
 Initialize the documentation structure for a project. Handles both fresh init and re-init of an already-initialized project.
 
 ### 5.1 Detect existing state
 
-1. **Scan first** — same deep scan as Section 3: README, source tree + tech stack, existing docs (inside and outside doc-root), `.docstruct/` state (`project-profile.yaml`, `schema.yaml`, `schema_version`, knowledge file count, agents config).
-2. **If `.docstruct/` already exists** (re-init path) — show what exists (profile, schema_version, doc-root, docs file count, knowledge N files) and ask:
-   - `[1] Override — rebuild from scratch` (fresh `.docstruct` + doc tree from templates)
+1. **Scan first** — same deep scan as Section 3: README, source tree + tech stack, existing docs (inside and outside doc-root), `.haro-docs/` state (`project-profile.yaml`, `schema.yaml`, `schema_version`, knowledge file count, agents config).
+2. **If `.haro-docs/` already exists** (re-init path) — show what exists (profile, schema_version, doc-root, docs file count, knowledge N files) and ask:
+   - `[1] Override — rebuild from scratch` (fresh `.haro-docs` + doc tree from templates)
    - `[2] Migrate / Upgrade — update structure in place, keep content` (recommended when docs/knowledge already have value)
    - `[3] Cancel`
    
@@ -164,7 +164,7 @@ Initialize the documentation structure for a project. Handles both fresh init an
    - **Documentation language** — the language of doc content: `en`, `vi`, or `vi-en` (definitions in Section 9)
 3. **Ask for the doc-root** — the user chooses:
    - `docs/` (traditional documentation folder), or
-   - `.docstruct/docs/` (contained within the skill workspace)
+   - `.haro-docs/docs/` (contained within the skill workspace)
 3b. **Decide conventions (compact, 4–6 questions)** — Part A (fixed by skill: file naming, SSOT, status lifecycle, language ref, images, auto-file rule) is seeded from `templates/conventions.md` without asking; show it as read-only preview. Ask only Part B (project-specific), offering scan-based defaults:
    - Diagram tool: `mermaid | plantuml | drawio` (+ image fallback)
    - API spec format: `openapi-yaml | md-table | both`
@@ -176,21 +176,21 @@ Initialize the documentation structure for a project. Handles both fresh init an
    Unanswered items use the stated defaults. Write `00-common/01-conventions.md` immediately (status RELEASED, single source MD-only — no YAML mirror).
 4. **Confirm the outline** — present the folder tree + specific file list (including the decided conventions); wait for user approval. If the project already has non-conforming documentation, propose a reorganization plan (migration mapping table `old path → new path | keep / move / archive to 99-assets/_legacy/`) in this step.
 5. **Initialize** — after approval:
-   - Create `.docstruct/project-profile.yaml` and `.docstruct/schema.yaml` (from templates in the skill's `templates/` directory) with `schema_version: 1`, including the chosen `language.response` and `language.documentation`
-   - Create `.docstruct/agents.yaml` from `templates/agents.yaml` if it does not exist (never overwrite an existing one without asking)
+   - Create `.haro-docs/project-profile.yaml` and `.haro-docs/schema.yaml` (from templates in the skill's `templates/` directory) with `schema_version: 1`, including the chosen `language.response` and `language.documentation`
+   - Create `.haro-docs/agents.yaml` from `templates/agents.yaml` if it does not exist (never overwrite an existing one without asking)
    - Write `00-common/01-conventions.md` from `templates/conventions.md` with the Part B values from step 3b; create `02-references.md`, `03-abbreviations.md`, `04-glossary.md`, `05-traceability.md` as placeholders marked `auto-populated by generate — do not edit manually`
    - Create the folder tree per the outline, each folder gets a `README.md` describing its scope
    - Create a root overview README at the doc-root including the reading path
 
 ### 5.3 Re-init: Override vs Migrate
 
-**Backup first (mandatory for both branches):** before touching anything, copy `.docstruct/` + the doc-root tree to `.docstruct.backup-<YYYYMMDD-HHmmss>/` and report the backup path in the reply. If backup fails, stop and ask the user.
+**Backup first (mandatory for both branches):** before touching anything, copy `.haro-docs/` + the doc-root tree to `.haro-docs.backup-<YYYYMMDD-HHmmss>/` and report the backup path in the reply. If backup fails, stop and ask the user.
 
 | | Override (rebuild) | Migrate / Upgrade (in place) |
 |---|---|---|
-| `.docstruct/project-profile.yaml` | Recreate from template (new `schema_version: 1`); re-ask language + doc-root | Keep + merge: preserve `language.*`, `docroot.path`, audience; only fill missing keys and bump `schema_version` |
-| `.docstruct/schema.yaml` | Recreate from template | Update in place: add missing folders/files, keep approved customizations; sync `meta.docroot` + `schema_version` |
-| `.docstruct/agents.yaml` | Recreate from template only if missing or user confirms | Keep user config; only merge missing keys (new agent ids, `default_reviewer`) |
+| `.haro-docs/project-profile.yaml` | Recreate from template (new `schema_version: 1`); re-ask language + doc-root | Keep + merge: preserve `language.*`, `docroot.path`, audience; only fill missing keys and bump `schema_version` |
+| `.haro-docs/schema.yaml` | Recreate from template | Update in place: add missing folders/files, keep approved customizations; sync `meta.docroot` + `schema_version` |
+| `.haro-docs/agents.yaml` | Recreate from template only if missing or user confirms | Keep user config; only merge missing keys (new agent ids, `default_reviewer`) |
 | `knowledge/` | **Preserved by default** — copy back from backup; only drop if user explicitly says so | Fully preserved; `_index.md` rebuilt if inconsistent |
 | Docs content | Fresh tree (user files gone from doc-root — still in backup) | Kept: never delete a user-written file; create only missing folders/files + missing `README.md` |
 | `00-common/01-conventions.md` | Written from template with Part B from step 3b | If missing: seed Part A + ask Part B. If exists: keep Part B, refresh Part A only on user confirm |
@@ -211,18 +211,18 @@ Use the agent's question/picker tool when available, otherwise a numbered list. 
 ### Examples
 
 ```
-/docstruct init E-commerce project with Next.js + PostgreSQL, team of 3 devs
-/docstruct init
+/haro-docs init E-commerce project with Next.js + PostgreSQL, team of 3 devs
+/haro-docs init
 ```
 
 With no description: still scan the current project first, then start asking from step 2 of §5.2.
 
-## 6. Command `/docstruct generate` / `generate <file>` — Build Docs in Order (Role-Adaptive)
+## 6. Command `/haro-docs generate` / `generate <file>` — Build Docs in Order (Role-Adaptive)
 
 Build documentation flexibly based on current state + your role. Two modes:
 
-- `/docstruct generate` — propose 2–3 next files to build, based on reality, not rigid order. Skips all `00-common` files — `01-conventions.md` is decided during `init` (§5.2 step 3b) and `02-references, 03-abbreviations, 04-glossary, 05-traceability` are auto-populated; start writing at `01-overview`.
-- `/docstruct generate <file>` — focus on a specific file (e.g. `02-business/01-value-prop.md` or `10-deliverables/01-BRD.md`) to create or adjust it. If the file is `RELEASED`, warn and ask to update.
+- `/haro-docs generate` — propose 2–3 next files to build, based on reality, not rigid order. Skips all `00-common` files — `01-conventions.md` is decided during `init` (§5.2 step 3b) and `02-references, 03-abbreviations, 04-glossary, 05-traceability` are auto-populated; start writing at `01-overview`.
+- `/haro-docs generate <file>` — focus on a specific file (e.g. `02-business/01-value-prop.md` or `10-deliverables/01-BRD.md`) to create or adjust it. If the file is `RELEASED`, warn and ask to update.
 
 ### Ordered index
 
@@ -230,11 +230,11 @@ Canonical order is `00-common → 01-overview → 02-business → 03-features �
 
 ### Elicitation storage
 
-Interim Q&A is stored in `.docstruct/elicitation/<sanitized-path>.md` (e.g. `02-business-01-value-prop.md`) to avoid context overload. It is read on demand during `generate` and not loaded by default. After the target file is completed, ask the user whether to keep or delete the elicitation file.
+Interim Q&A is stored in `.haro-docs/elicitation/<sanitized-path>.md` (e.g. `02-business-01-value-prop.md`) to avoid context overload. It is read on demand during `generate` and not loaded by default. After the target file is completed, ask the user whether to keep or delete the elicitation file.
 
 ### Status
 
-Each doc file carries `status:` in frontmatter and a mirror in `.docstruct/status/<path>`:
+Each doc file carries `status:` in frontmatter and a mirror in `.haro-docs/status/<path>`:
 
 - `DRAFT` — brand-new file, first version.
 - `UPDATING` — has reference content and is being edited.
@@ -263,15 +263,15 @@ No backward compatibility: every creation or adjustment is treated as the **firs
    - New external reference (link, doc, standard) → append to `00-common/02-references.md`.
    No confirmation needed; just note `Auto-updated 00-common: +2 terms, +1 abbreviation.` in the reply. Deduplicate before appending and respect `status: RELEASED` — still auto-append even to RELEASED `00-common` files (they are living references).
 7. **Elicitation cleanup** — ask `Keep elicitation file for reference or delete? (keep / delete)`. Act accordingly.
-8. **Confirm & mark status** — ask `Mark this file as? (DRAFT / UPDATING / RELEASED)`. Default is `RELEASED` if the user says the file is done. Update frontmatter and `.docstruct/status/<path>` accordingly. `RELEASED` files become referenceable by later `generate` runs.
+8. **Confirm & mark status** — ask `Mark this file as? (DRAFT / UPDATING / RELEASED)`. Default is `RELEASED` if the user says the file is done. Update frontmatter and `.haro-docs/status/<path>` accordingly. `RELEASED` files become referenceable by later `generate` runs.
 9. **Next-step popup** — after marking status, always ask what to do next (picker tool when available, otherwise numbered list). Propose 2–3 concrete candidates based on the fresh reality scan (prerequisites + gaps), each with a one-line reason, plus `review <just-finished file>` and `stop`. Example: `1. generate 02-business/01-value-prop.md — business value needed before architecture; 2. review 01-overview/01-problem-statement.md — just RELEASED, worth a critic pass; 3. stop`. Wait for the pick; do NOT auto-run.
 
 ### Examples
 
 ```
-/docstruct generate
-/docstruct generate 02-business/01-value-prop.md
-/docstruct generate 10-deliverables/01-BRD.md
+/haro-docs generate
+/haro-docs generate 02-business/01-value-prop.md
+/haro-docs generate 10-deliverables/01-BRD.md
 ```
 
 ## 7. Aggregation Matrix
@@ -293,7 +293,7 @@ No backward compatibility: every creation or adjustment is treated as the **firs
 Single structure for all projects:
 
 ```
-docs/                        # or .docstruct/docs/ depending on user-chosen doc-root
+docs/                        # or .haro-docs/docs/ depending on user-chosen doc-root
 ├── 00-common/               # 01-conventions.md, 02-references.md, 03-abbreviations.md, 04-glossary.md, 05-traceability.md (01 manual, 02-05 auto)
 ├── 01-overview/             # 01-problem-statement.md, 02-vision.md, 03-goals.md, 04-scope.md, 05-stakeholders.md, 06-constraints.md, 07-roadmap.md (Version|Goal|Target|Status)
 ├── 02-business/             # 01-value-proposition.md, 02-market-analysis.md, 03-business-model.md, 04-pricing.md, 05-sla.md, 06-risk-legal.md, use-cases/, change-requests/CR-*.md
@@ -350,25 +350,25 @@ Folders not yet needed may stay with their `README.md` and a short `> Out of sco
 4. **No duplication:** check the glossary before defining a new term.
 5. **File naming:** kebab-case with numeric prefix indicating reading order — e.g. `01-problem-statement.md`.
 6. **Images/diagrams:** store in `99-assets/`, reference via relative paths; no inline base64.
-7. **Block lifecycle:** each block has status `draft → review → approved`, tracked in `.docstruct/status/`; only `approved` blocks may be aggregated into deliverables without further review.
+7. **Block lifecycle:** each block has status `draft → review → approved`, tracked in `.haro-docs/status/`; only `approved` blocks may be aggregated into deliverables without further review.
 8. **Sub-READMEs:** every folder must have a `README.md` describing its scope and file list.
 
-## 10. Command `/docstruct review <topic|file>` — Critical Review via Subagent Reviewers
+## 10. Command `/haro-docs review <topic|file>` — Critical Review via Subagent Reviewers
 
-Objectively research, analyze and evaluate a problem, idea, or doc file using critical thinking and logic. The skill dispatches reviewer subagent(s) ("đệ tử"), then synthesizes their reports into one verdict plus follow-up proposals. **Read-only on docs**: never edits the reviewed file; only optionally saves a report under `.docstruct/reviews/` after asking.
+Objectively research, analyze and evaluate a problem, idea, or doc file using critical thinking and logic. The skill dispatches reviewer subagent(s) ("đệ tử"), then synthesizes their reports into one verdict plus follow-up proposals. **Read-only on docs**: never edits the reviewed file; only optionally saves a report under `.haro-docs/reviews/` after asking.
 
 ### Syntax
 
 ```
-/docstruct review Should we use microservices for this project?
-/docstruct review 04-architecture/02-components.md
-/docstruct review --no-agents The current pricing model has a flaw
+/haro-docs review Should we use microservices for this project?
+/haro-docs review 04-architecture/02-components.md
+/haro-docs review --no-agents The current pricing model has a flaw
 ```
 
 ### Workflow
 
 1. **Parse target + load context (selective RAG)** — read `knowledge/_index.md` (if exists), load only rows whose domain/tags match the topic. If the target is a doc path: read that file + nearby files in the same folder + glossary. If it is a free-text problem: lightly scan repo + doc-root for relevant evidence. State what was loaded (`sources: ...`) so reviewers can cite it.
-2. **Resolve reviewers from `.docstruct/agents.yaml`:**
+2. **Resolve reviewers from `.haro-docs/agents.yaml`:**
    - If the file is missing: use a single inline `critic` with the default prompt from `templates/agents.yaml` (single-critic mode).
    - If the file exists: show enabled agents (`id | role`) and let the user multi-select (picker tool when available, otherwise numbered list). Pre-select `default_reviewer`. Default mode is **single critic**; multi-agent runs only when the user selects 2+ agents or the topic explicitly needs research + critique.
    - `--no-agents` flag forces single inline critic, ignoring the config (useful for debugging).
@@ -387,28 +387,28 @@ Objectively research, analyze and evaluate a problem, idea, or doc file using cr
    - `Overall verdict:` agree | conditionally-agree | disagree + 3–5 line rationale
    - `Risks & alternatives:` short list
    Reply in `language.response`. Be objective: report disagreements honestly instead of hiding them.
-5. **Save report (ask first)** — ask `Save review report to .docstruct/reviews/? (save / skip)`. On `save`, write `.docstruct/reviews/RR-YYYYMMDD-HHmmss-<slug>.md` with frontmatter (`topic, verdict, reviewers, date, sources`) + the synthesis + per-reviewer summaries. Never save without asking.
+5. **Save report (ask first)** — ask `Save review report to .haro-docs/reviews/? (save / skip)`. On `save`, write `.haro-docs/reviews/RR-YYYYMMDD-HHmmss-<slug>.md` with frontmatter (`topic, verdict, reviewers, date, sources`) + the synthesis + per-reviewer summaries. Never save without asking.
 6. **Next-step popup** — after the synthesis, always propose follow-ups (picker when available): e.g. `generate <related file>`, `remember <new fact surfaced>`, `review again with more evidence`, `stop`. Wait for the pick; do NOT auto-run.
 
 ### Examples
 
 ```
-/docstruct review Should we use microservices for this project?
-/docstruct review 05-security/01-threat-model.md
-/docstruct review --no-agents Is the current SLA realistic?
+/haro-docs review Should we use microservices for this project?
+/haro-docs review 05-security/01-threat-model.md
+/haro-docs review --no-agents Is the current SLA realistic?
 ```
 
-## 11. Command `/docstruct config` — Config Hub (agents | conventions | language)
+## 11. Command `/haro-docs config` — Config Hub (agents | conventions | language)
 
 Central hub for skill configuration. Three branches, no `doc-root` here (changing doc-root is a heavy migrate — keep it in `init`).
 
 ### 11.1 Hub (no args)
 
 ```
-/docstruct config               → hub picker (read-only until a branch is chosen)
-/docstruct config agents        → straight into §11.2
-/docstruct config conventions   → straight into §11.3
-/docstruct config language      → straight into §11.4
+/haro-docs config               → hub picker (read-only until a branch is chosen)
+/haro-docs config agents        → straight into §11.2
+/haro-docs config conventions   → straight into §11.3
+/haro-docs config language      → straight into §11.4
 ```
 
 Workflow:
@@ -422,12 +422,12 @@ Workflow:
 
 ### 11.2 Branch: agents — Manage Reviewer Subagents
 
-Manage the `.docstruct/agents.yaml` configuration:
+Manage the `.haro-docs/agents.yaml` configuration:
 
 1. If the file is missing, create it from the skill's `templates/agents.yaml` and show its contents.
 2. Otherwise list enabled/disabled agents as `id | role | enabled | default?`.
 3. Offer operations (picker when available, otherwise numbered list): `add agent | edit role/prompt | enable / disable | set default_reviewer | reset from template (ask before overwriting custom prompts)`.
-4. After any change, re-render the list and remind that `/docstruct review` will offer these agents for selection. `init` never overwrites an existing `agents.yaml` without asking (it only merges missing keys) — see Section 5.3.
+4. After any change, re-render the list and remind that `/haro-docs review` will offer these agents for selection. `init` never overwrites an existing `agents.yaml` without asking (it only merges missing keys) — see Section 5.3.
 
 ### 11.3 Branch: conventions — Edit Project-Specific Conventions
 
@@ -440,5 +440,5 @@ Edit Part B of `00-common/01-conventions.md` (Part A is fixed by the skill):
 
 ### 11.4 Branch: language — Reply + Documentation Language
 
-1. Show current `language.response` + `language.documentation` from `.docstruct/project-profile.yaml` (with `vi` vs `vi-en` definitions from Section 9).
+1. Show current `language.response` + `language.documentation` from `.haro-docs/project-profile.yaml` (with `vi` vs `vi-en` definitions from Section 9).
 2. Offer change with `en | vi | vi-en` options as applicable; confirm before writing back to `project-profile.yaml`.
